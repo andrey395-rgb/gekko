@@ -2,13 +2,46 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import ReactMarkdown from 'react-markdown'
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  MoreVertical, 
+  X, 
+  Send,
+  User as UserIcon,
+  Tag,
+  AlertTriangle,
+  ChevronRight,
+  GripVertical,
+  Clock
+} from 'lucide-react'
+
+type Profile = {
+  id: string
+  email: string
+  full_name: string | null
+}
 
 type Ticket = {
   id: number
   title: string
+  description: string | null 
   type: string
   priority: string
   status: string
+  assignee_id: string | null
+}
+
+type Comment = {
+  id: number
+  content: string
+  created_at: string
+  profiles: {
+    full_name: string | null
+    email: string
+  }
 }
 
 export default function TicketsPage() {
@@ -16,119 +49,243 @@ export default function TicketsPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('') 
   const [type, setType] = useState('Task')
   const [priority, setPriority] = useState('Medium')
   const [status, setStatus] = useState('Open')
+  const [assigneeId, setAssigneeId] = useState<string>('unassigned')
   
   const [tickets, setTickets] = useState<Ticket[]>([])
-  // NEW: State to track which ticket is currently being dragged
+  const [team, setTeam] = useState<Profile[]>([])
   const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null)
   
+  const [filterType, setFilterType] = useState('All')
+  const [filterPriority, setFilterPriority] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [newComment, setNewComment] = useState('')
+
   const supabase = createClient()
 
-  const fetchTickets = async () => {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select('*')
-      .order('created_at', { ascending: false })
+  const fetchData = async () => {
+    const { data: ticketsData } = await supabase.from('tickets').select('*').order('created_at', { ascending: false })
+    if (ticketsData) setTickets(ticketsData)
 
-    if (!error && data) setTickets(data)
+    const { data: teamData } = await supabase.from('profiles').select('id, email, full_name')
+    if (teamData) setTeam(teamData)
   }
 
-  useEffect(() => { fetchTickets() }, [])
+  useEffect(() => { fetchData() }, [])
+
+  const fetchComments = async (ticketId: number) => {
+    const { data } = await supabase
+      .from('comments')
+      .select('*, profiles(full_name, email)') 
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true })
+    if (data) setComments(data as any)
+  }
+
+  const handleTicketClick = (ticket: Ticket) => {
+    setSelectedTicket(ticket)
+    fetchComments(ticket.id)
+  }
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim() || !selectedTicket) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const { error } = await supabase
+      .from('comments')
+      .insert([{ ticket_id: selectedTicket.id, author_id: session.user.id, content: newComment }])
+
+    if (!error) {
+      setNewComment('')
+      fetchComments(selectedTicket.id)
+    }
+  }
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error } = await supabase.from('tickets').insert([{ title, type, priority, status }])
+    const newTicket = { 
+      title, 
+      description: description || null, 
+      type, 
+      priority, 
+      status, 
+      assignee_id: assigneeId === 'unassigned' ? null : assigneeId 
+    }
+    const { error } = await supabase.from('tickets').insert([newTicket])
     if (!error) {
       setTitle('')
+      setDescription('') 
+      setAssigneeId('unassigned')
       setIsModalOpen(false)
-      fetchTickets() 
+      fetchData() 
     }
   }
 
-  // NEW: Handle the drop event
   const handleDrop = async (e: React.DragEvent, newStatus: string) => {
-    e.preventDefault() // Required to allow dropping
-    
+    e.preventDefault()
     if (!draggedTicketId) return
-
-    // 1. Optimistically update the UI instantly so it feels blazing fast
-    setTickets(tickets.map(t => 
-      t.id === draggedTicketId ? { ...t, status: newStatus } : t
-    ))
-
-    // 2. Update the database silently in the background
-    const { error } = await supabase
-      .from('tickets')
-      .update({ status: newStatus })
-      .eq('id', draggedTicketId)
-
-    if (error) {
-      alert(`Failed to update ticket: ${error.message}`)
-      fetchTickets() // Revert UI if DB fails
-    }
-    
+    setTickets(tickets.map(t => t.id === draggedTicketId ? { ...t, status: newStatus } : t))
+    const { error } = await supabase.from('tickets').update({ status: newStatus }).eq('id', draggedTicketId)
+    if (error) fetchData() 
     setDraggedTicketId(null)
   }
 
+  const getAssigneeInitials = (id: string | null) => {
+    if (!id) return null
+    const member = team.find(m => m.id === id)
+    if (!member) return null
+    return (member.full_name || member.email).substring(0, 2).toUpperCase()
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch(priority) {
+      case 'Critical': return 'text-red-500 bg-red-500/10 border-red-500/20'
+      case 'High': return 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+      case 'Medium': return 'text-blue-500 bg-blue-500/10 border-blue-500/20'
+      default: return 'text-muted bg-accent border-border'
+    }
+  }
+
   return (
-    <div className="h-full flex flex-col relative">
-      <div className="flex justify-between items-center mb-6">
+    <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-          <p className="text-gray-500">Manage and track your sprint tasks.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Tickets</h1>
+          <p className="text-muted text-sm mt-1">Manage and track your team's development tasks.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium transition-colors"
+          onClick={() => setIsModalOpen(true)} 
+          className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
         >
-          + New Ticket
+          <Plus size={16} strokeWidth={2.5} /> New Ticket
         </button>
       </div>
 
-      <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
-        {columns.map((column) => {
-          const columnTickets = tickets.filter(ticket => ticket.status === column)
+      {/* Filter Bar */}
+      <div className="flex flex-col md:flex-row gap-3 bg-card p-2 rounded-lg border border-border">
+        <div className="flex-1 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input 
+            type="text" 
+            placeholder="Search tickets..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-accent/50 border-none rounded-md pl-9 pr-4 py-1.5 text-xs focus:ring-1 focus:ring-primary placeholder:text-muted/60"
+          />
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Type</span>
+            <select 
+              value={filterType} 
+              onChange={(e) => setFilterType(e.target.value)} 
+              className="bg-accent border-border text-[12px] rounded-md px-2 py-1 focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+            >
+              <option value="All">All Types</option>
+              <option value="Bug">Bug</option>
+              <option value="Feature">Feature</option>
+              <option value="Task">Task</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Priority</span>
+            <select 
+              value={filterPriority} 
+              onChange={(e) => setFilterPriority(e.target.value)} 
+              className="bg-accent border-border text-[12px] rounded-md px-2 py-1 focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          {(filterType !== 'All' || filterPriority !== 'All') && (
+            <button 
+              onClick={() => { setFilterType('All'); setFilterPriority('All') }} 
+              className="text-[11px] text-emerald-500 font-bold hover:underline px-2 shrink-0"
+            >
+              CLEAR
+            </button>
+          )}
+        </div>
+      </div>
 
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-x-auto pb-6 -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-4 min-w-full">
+          {columns.map((column) => {
+          const columnTickets = tickets.filter(ticket => 
+            ticket.status === column && 
+            (filterType === 'All' || ticket.type === filterType) && 
+            (filterPriority === 'All' || ticket.priority === filterPriority) &&
+            (searchQuery.trim() === '' || 
+              ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              ticket.id.toString().includes(searchQuery)
+            )
+          )
           return (
             <div 
               key={column} 
-              className="flex-none w-80 bg-gray-100/50 rounded-lg flex flex-col transition-colors"
-              // NEW: Drag and Drop event listeners on the column
+              className="flex-1 min-w-[280px] sm:min-w-[320px] flex flex-col rounded-lg bg-accent/20 border border-transparent hover:border-border transition-colors group"
               onDragOver={(e) => e.preventDefault()} 
               onDrop={(e) => handleDrop(e, column)}
             >
-              <div className="p-3 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-700">{column}</h3>
-                <span className="bg-gray-200 text-gray-600 text-xs py-1 px-2 rounded-full">
-                  {columnTickets.length}
-                </span>
+              <div className="p-3 border-b border-border/40 flex justify-between items-center bg-accent/10">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-widest">{column}</h3>
+                  <span className="bg-accent text-muted text-[10px] font-bold py-0.5 px-2 rounded-full border border-border">
+                    {columnTickets.length}
+                  </span>
+                </div>
+                <MoreVertical size={14} className="text-muted/40 group-hover:text-muted cursor-pointer transition-colors" />
               </div>
               
-              <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+              <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                 {columnTickets.length === 0 ? (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-gray-400 text-sm">
-                    Drop tickets here
+                  <div className="h-20 border border-dashed border-border/60 rounded-lg flex items-center justify-center text-muted/40 text-[11px] font-medium italic">
+                    No tickets in {column}
                   </div>
                 ) : (
                   columnTickets.map(ticket => (
                     <div 
                       key={ticket.id} 
-                      // NEW: Make the card draggable and track when drag starts
-                      draggable
-                      onDragStart={() => setDraggedTicketId(ticket.id)}
-                      className="bg-white p-4 rounded-md shadow-sm border border-gray-200 cursor-grab active:cursor-grabbing hover:border-emerald-400 transition-colors"
+                      draggable 
+                      onDragStart={() => setDraggedTicketId(ticket.id)} 
+                      onClick={() => handleTicketClick(ticket)}
+                      className="bg-card p-3 rounded-lg border border-border shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/40 hover:bg-accent/30 transition-all group/card relative"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded text-gray-600">
-                          {ticket.type}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPriorityColor(ticket.priority)} uppercase tracking-tighter`}>
+                          {ticket.priority}
                         </span>
-                        <span className="text-xs text-gray-400">#{ticket.id}</span>
+                        <span className="text-[10px] text-muted font-mono opacity-40 group-hover/card:opacity-100 transition-opacity">#{ticket.id}</span>
                       </div>
-                      <h4 className="font-medium text-gray-900 line-clamp-2">{ticket.title}</h4>
-                      <div className="mt-3 flex justify-between items-center">
-                        <span className="text-xs text-gray-500">Priority: {ticket.priority}</span>
+                      <h4 className="text-sm font-medium text-foreground line-clamp-2 leading-snug group-hover/card:text-primary transition-colors">{ticket.title}</h4>
+                      
+                      <div className="mt-4 flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Tag size={12} className="text-muted" />
+                          <span className="text-[11px] text-muted font-medium">{ticket.type}</span>
+                        </div>
+                        
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${ticket.assignee_id ? 'bg-primary/10 text-primary border-primary/20' : 'bg-accent text-muted/40 border-border border-dashed'}`}>
+                          {getAssigneeInitials(ticket.assignee_id) || <UserIcon size={10} />}
+                        </div>
+                      </div>
+                      
+                      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/card:opacity-20 transition-opacity">
+                        <GripVertical size={14} className="text-foreground" />
                       </div>
                     </div>
                   ))
@@ -137,32 +294,209 @@ export default function TicketsPage() {
             </div>
           )
         })}
+        </div>
       </div>
 
-      {/* New Ticket Modal Overlay (Unchanged) */}
-      {isModalOpen && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Create New Ticket</h2>
-            <form onSubmit={handleCreateTicket} className="space-y-4">
-              {/* Form fields omitted for brevity, keep what you had! */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Title</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border" required />
+      {/* Ticket Detail Modal (Full-screen sheet on mobile) */}
+      {selectedTicket && (
+        <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[100] backdrop-blur-sm animate-in fade-in duration-300 p-0 sm:p-4">
+          <div className="bg-card w-full sm:max-w-4xl h-[95vh] sm:h-auto sm:max-h-[90vh] sm:rounded-xl border-t sm:border border-border flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+            
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-accent/20 shrink-0">
+              <div className="flex items-center gap-4">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getPriorityColor(selectedTicket.priority)} uppercase`}>
+                  {selectedTicket.priority}
+                </span>
+                <span className="text-xs text-muted font-mono">TICKET-{selectedTicket.id}</span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => setSelectedTicket(null)} 
+                className="text-muted hover:text-foreground p-1.5 hover:bg-accent rounded-md transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto flex flex-col md:flex-row">
+              {/* Main Content */}
+              <div className="flex-1 p-6 space-y-8 border-r border-border/40">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Type</label>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                  <h2 className="text-2xl font-bold text-foreground leading-tight">{selectedTicket.title}</h2>
+                  <div className="mt-4 flex items-center gap-6">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase font-bold text-muted tracking-widest">Type</span>
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Tag size={14} className="text-primary" /> {selectedTicket.type}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase font-bold text-muted tracking-widest">Status</span>
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> {selectedTicket.status}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                    Description
+                  </h3>
+                  <div className="bg-accent/30 p-4 rounded-lg border border-border/40 text-[13px] leading-relaxed text-foreground/80 prose prose-invert prose-sm max-w-none prose-pre:bg-black/40 prose-pre:border prose-pre:border-border/40 prose-code:text-primary">
+                    {selectedTicket.description ? (
+                      <ReactMarkdown>{selectedTicket.description}</ReactMarkdown>
+                    ) : (
+                      <p className="text-muted italic opacity-50">No description provided for this ticket.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-border/20">
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-widest">Activity</h3>
+                  <div className="space-y-4">
+                    {comments.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center bg-accent/10 rounded-lg border border-dashed border-border/40">
+                        <Send size={24} className="text-muted/20 mb-2" />
+                        <p className="text-xs text-muted/60">No comments yet. Be the first to chime in!</p>
+                      </div>
+                    ) : (
+                      comments.map(comment => (
+                        <div key={comment.id} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                          <div className="w-8 h-8 rounded-full bg-accent border border-border flex items-center justify-center text-[10px] font-bold text-muted shrink-0 mt-0.5">
+                            {(comment.profiles?.full_name || comment.profiles?.email || '?').substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-xs font-bold text-foreground">
+                                {comment.profiles?.full_name || comment.profiles?.email}
+                              </span>
+                              <span className="text-[10px] text-muted opacity-40">
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="bg-accent/20 p-3 rounded-lg border border-border/40 text-xs text-foreground/70 prose prose-invert prose-xs max-w-none">
+                              <ReactMarkdown>{comment.content}</ReactMarkdown>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <form onSubmit={handleAddComment} className="flex gap-2 pt-4 group">
+                    <div className="flex-1 relative">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write a comment..."
+                        className="w-full bg-accent/50 border border-border rounded-lg p-3 text-xs focus:ring-1 focus:ring-primary outline-none min-h-[80px] transition-all placeholder:text-muted/40"
+                        required
+                      />
+                      <button 
+                        type="submit" 
+                        className="absolute right-2 bottom-2 bg-primary text-primary-foreground p-1.5 rounded-md hover:scale-110 transition-transform disabled:opacity-50 disabled:scale-100 shadow-lg"
+                        disabled={!newComment.trim()}
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              {/* Sidebar Info */}
+              <div className="w-full md:w-[280px] bg-accent/10 p-6 space-y-8 shrink-0">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] uppercase font-bold text-muted tracking-widest">Assignee</h3>
+                  <div className="flex items-center gap-3 p-2 bg-card rounded-lg border border-border shadow-sm">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border ${selectedTicket.assignee_id ? 'bg-primary/10 text-primary border-primary/20 shadow-[0_0_10px_rgba(62,207,142,0.1)]' : 'bg-accent text-muted/40 border-border border-dashed'}`}>
+                      {getAssigneeInitials(selectedTicket.assignee_id) || <UserIcon size={12} />}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">
+                        {team.find(m => m.id === selectedTicket.assignee_id)?.full_name || team.find(m => m.id === selectedTicket.assignee_id)?.email || 'Unassigned'}
+                      </span>
+                      <span className="text-[10px] text-muted">Core Contributor</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] uppercase font-bold text-muted tracking-widest">Metadata</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-border/40">
+                      <span className="text-[11px] text-muted flex items-center gap-2"><Clock size={12} /> Created</span>
+                      <span className="text-[11px] font-medium text-foreground">Today</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-border/40">
+                      <span className="text-[11px] text-muted flex items-center gap-2"><AlertTriangle size={12} /> Blockers</span>
+                      <span className="text-[11px] font-medium text-muted">None</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Ticket Modal (Full-screen sheet on mobile) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[100] backdrop-blur-sm animate-in fade-in duration-300 p-0 sm:p-4">
+          <div className="bg-card w-full sm:max-w-lg h-[95vh] sm:h-auto sm:rounded-xl border-t sm:border border-border flex flex-col shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-accent/20 shrink-0">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2"><Plus size={20} className="text-primary" /> Create Ticket</h2>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="text-muted hover:text-foreground p-1.5 hover:bg-accent rounded-md transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateTicket} className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Ticket Title</label>
+                <input 
+                  type="text" 
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)} 
+                  placeholder="What needs to be done?"
+                  className="w-full bg-accent/50 border border-border rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted/40 shadow-inner" 
+                  required 
+                />
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Description (Markdown)</label>
+                <textarea 
+                  value={description} 
+                  onChange={(e) => setDescription(e.target.value)} 
+                  className="w-full bg-accent/50 border border-border rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary outline-none transition-all resize-none min-h-[120px] placeholder:text-muted/40 shadow-inner"
+                  placeholder="Details, reproduction steps, etc..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Type</label>
+                  <select 
+                    value={type} 
+                    onChange={(e) => setType(e.target.value)} 
+                    className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
+                  >
                     <option value="Bug">Bug</option>
                     <option value="Feature">Feature</option>
                     <option value="Task">Task</option>
-                    <option value="Question">Question</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Priority</label>
-                  <select value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Priority</label>
+                  <select 
+                    value={priority} 
+                    onChange={(e) => setPriority(e.target.value)} 
+                    className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
+                  >
                     <option value="Critical">Critical</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -170,9 +504,35 @@ export default function TicketsPage() {
                   </select>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Cancel</button>
-                <button type="submit" className="bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800">Create Ticket</button>
+              
+              <div className="space-y-1.5 pb-2">
+                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Assignee</label>
+                <select 
+                  value={assigneeId} 
+                  onChange={(e) => setAssigneeId(e.target.value)} 
+                  className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
+                >
+                  <option value="unassigned">Unassigned</option>
+                  {team.map(member => (
+                    <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-muted hover:text-foreground hover:bg-accent rounded-lg transition-all border border-transparent hover:border-border"
+                >
+                  Discard
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/10 active:scale-95"
+                >
+                  Create Ticket
+                </button>
               </div>
             </form>
           </div>
