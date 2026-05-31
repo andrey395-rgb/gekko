@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
   Zap, 
@@ -22,6 +23,8 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
   const supabase = createClient()
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -65,7 +68,7 @@ export default function RegisterPage() {
           </div>
           <div className="pt-4 border-t border-border/40">
             <Link 
-              href="/login" 
+              href={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
               className="text-primary text-xs font-bold hover:underline flex items-center justify-center gap-2"
             >
               PROCEED TO LOGIN <ArrowRight size={14} />
@@ -171,7 +174,7 @@ export default function RegisterPage() {
         <p className="text-center text-xs text-muted">
           Already have an account?{' '}
           <Link 
-            href="/login" 
+            href={`/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
             className="text-primary font-bold hover:underline transition-colors"
           >
             SIGN IN

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Zap, Mail, Lock, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
 
@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
   const supabase = createClient()
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -26,7 +28,7 @@ export default function LoginPage() {
       setError(error.message)
       setIsLoading(false)
     } else {
-      router.push('/')
+      router.push(returnTo || '/')
       router.refresh()
     }
   }
@@ -112,7 +114,7 @@ export default function LoginPage() {
         <p className="text-center text-xs text-muted">
           New to Gekko?{' '}
           <Link 
-            href="/register" 
+            href={`/register${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
             className="text-primary font-bold hover:underline transition-colors"
           >
             CREATE ACCOUNT

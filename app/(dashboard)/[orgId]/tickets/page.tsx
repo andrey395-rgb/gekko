@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import { 
@@ -17,6 +17,8 @@ import {
   GripVertical,
   Clock
 } from 'lucide-react'
+import { Skeleton } from '@/components/Skeleton'
+import { toast } from 'react-hot-toast'
 
 type Profile = {
   id: string
@@ -32,6 +34,7 @@ type Ticket = {
   priority: string
   status: string
   assignee_id: string | null
+  organization_id: string
 }
 
 type Comment = {
@@ -44,7 +47,8 @@ type Comment = {
   }
 }
 
-export default function TicketsPage() {
+export default function TicketsPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = useReact(params)
   const columns = ['Open', 'In Progress', 'Review', 'Closed']
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -57,6 +61,7 @@ export default function TicketsPage() {
   
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [team, setTeam] = useState<Profile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null)
   
   const [filterType, setFilterType] = useState('All')
@@ -70,14 +75,27 @@ export default function TicketsPage() {
   const supabase = createClient()
 
   const fetchData = async () => {
-    const { data: ticketsData } = await supabase.from('tickets').select('*').order('created_at', { ascending: false })
+    setIsLoading(true)
+    const { data: ticketsData } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false })
+    
     if (ticketsData) setTickets(ticketsData)
 
-    const { data: teamData } = await supabase.from('profiles').select('id, email, full_name')
-    if (teamData) setTeam(teamData)
+    const { data: teamData } = await supabase
+      .from('organization_members')
+      .select('profiles(id, email, full_name)')
+      .eq('organization_id', orgId)
+    
+    if (teamData) {
+      setTeam(teamData.map((m: any) => m.profiles) as Profile[])
+    }
+    setIsLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [orgId])
 
   const fetchComments = async (ticketId: number) => {
     const { data } = await supabase
@@ -127,15 +145,26 @@ export default function TicketsPage() {
       setAssigneeId('unassigned')
       setIsModalOpen(false)
       fetchData() 
+      toast.success('Ticket created successfully')
+    } else {
+      toast.error('Failed to create ticket')
     }
   }
 
   const handleDrop = async (e: React.DragEvent, newStatus: string) => {
     e.preventDefault()
     if (!draggedTicketId) return
+    
+    const originalTickets = [...tickets]
     setTickets(tickets.map(t => t.id === draggedTicketId ? { ...t, status: newStatus } : t))
+    
     const { error } = await supabase.from('tickets').update({ status: newStatus }).eq('id', draggedTicketId)
-    if (error) fetchData() 
+    if (error) {
+      setTickets(originalTickets)
+      toast.error('Failed to update ticket status')
+    } else {
+      toast.success(`Moved to ${newStatus}`)
+    }
     setDraggedTicketId(null)
   }
 
@@ -252,7 +281,22 @@ export default function TicketsPage() {
               </div>
               
               <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-                {columnTickets.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-card/50 p-3 rounded-lg border border-border/50 space-y-3">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-4 w-8" />
+                      </div>
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <div className="flex justify-between items-center pt-2">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                      </div>
+                    </div>
+                  ))
+                ) : columnTickets.length === 0 ? (
                   <div className="h-20 border border-dashed border-border/60 rounded-lg flex items-center justify-center text-muted/40 text-[11px] font-medium italic">
                     No tickets in {column}
                   </div>
