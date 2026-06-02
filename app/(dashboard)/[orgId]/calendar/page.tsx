@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
   Calendar as CalendarIcon, 
@@ -18,9 +18,11 @@ type Sprint = {
   goal: string | null
   start_date: string
   end_date: string
+  organization_id: string
 }
 
-export default function CalendarPage() {
+export default function CalendarPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = useReact(params)
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
@@ -30,6 +32,7 @@ export default function CalendarPage() {
       const { data, error } = await supabase
         .from('sprints')
         .select('*')
+        .eq('organization_id', orgId)
         .order('start_date', { ascending: true })
 
       if (!error && data) {
@@ -39,7 +42,7 @@ export default function CalendarPage() {
     }
 
     fetchSprints()
-  }, [])
+  }, [orgId])
 
   const getSprintStatus = (startDate: string, endDate: string) => {
     const start = new Date(startDate).getTime()

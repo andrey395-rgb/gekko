@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
   Zap, 
@@ -12,6 +12,8 @@ import {
   Clock,
   CheckCircle2
 } from 'lucide-react'
+import { Skeleton } from '@/components/Skeleton'
+import { toast } from 'react-hot-toast'
 
 type Sprint = {
   id: number
@@ -19,10 +21,13 @@ type Sprint = {
   goal: string | null
   start_date: string
   end_date: string
+  organization_id: string
 }
 
-export default function SprintsPage() {
+export default function SprintsPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = useReact(params)
   const [sprints, setSprints] = useState<Sprint[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
   const [name, setName] = useState('')
@@ -33,21 +38,25 @@ export default function SprintsPage() {
   const supabase = createClient()
 
   const fetchSprints = async () => {
+    setIsLoading(true)
     const { data, error } = await supabase
       .from('sprints')
       .select('*')
+      .eq('organization_id', orgId)
       .order('start_date', { ascending: false })
 
     if (error) {
       console.error('Error fetching sprints:', error)
+      toast.error('Failed to load sprints')
     } else if (data) {
       setSprints(data)
     }
+    setIsLoading(false)
   }
 
   useEffect(() => {
     fetchSprints()
-  }, [])
+  }, [orgId])
 
   const handleCreateSprint = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,11 +67,12 @@ export default function SprintsPage() {
         name, 
         goal: goal || null,
         start_date: startDate, 
-        end_date: endDate 
+        end_date: endDate,
+        organization_id: orgId
       }])
 
     if (error) {
-      alert(`Error: ${error.message}`)
+      toast.error(`Error: ${error.message}`)
     } else {
       setIsModalOpen(false)
       setName('')
@@ -70,6 +80,7 @@ export default function SprintsPage() {
       setStartDate('')
       setEndDate('')
       fetchSprints()
+      toast.success('Sprint planned successfully')
     }
   }
 
@@ -89,7 +100,22 @@ export default function SprintsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sprints.length === 0 ? (
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden p-6 space-y-4">
+              <Skeleton className="h-4 w-16" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              <Skeleton className="h-16 w-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-1.5 w-full rounded-full" />
+              </div>
+            </div>
+          ))
+        ) : sprints.length === 0 ? (
           <div className="col-span-full py-16 flex flex-col items-center justify-center text-center bg-accent/20 border border-dashed border-border rounded-xl">
             <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mb-4">
               <Zap size={24} className="text-muted/40" />

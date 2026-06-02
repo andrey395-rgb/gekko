@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import { 
@@ -15,8 +15,13 @@ import {
   AlertTriangle,
   ChevronRight,
   GripVertical,
-  Clock
+  Clock,
+  Paperclip,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react'
+import { Skeleton } from '@/components/Skeleton'
+import { toast } from 'react-hot-toast'
 
 type Profile = {
   id: string
@@ -32,6 +37,8 @@ type Ticket = {
   priority: string
   status: string
   assignee_id: string | null
+  organization_id: string
+  attachment_urls?: string[]
 }
 
 type Comment = {
@@ -44,7 +51,8 @@ type Comment = {
   }
 }
 
-export default function TicketsPage() {
+export default function TicketsPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = useReact(params)
   const columns = ['Open', 'In Progress', 'Review', 'Closed']
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -54,9 +62,12 @@ export default function TicketsPage() {
   const [priority, setPriority] = useState('Medium')
   const [status, setStatus] = useState('Open')
   const [assigneeId, setAssigneeId] = useState<string>('unassigned')
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [team, setTeam] = useState<Profile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null)
   
   const [filterType, setFilterType] = useState('All')
@@ -70,14 +81,27 @@ export default function TicketsPage() {
   const supabase = createClient()
 
   const fetchData = async () => {
-    const { data: ticketsData } = await supabase.from('tickets').select('*').order('created_at', { ascending: false })
+    setIsLoading(true)
+    const { data: ticketsData } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false })
+    
     if (ticketsData) setTickets(ticketsData)
 
-    const { data: teamData } = await supabase.from('profiles').select('id, email, full_name')
-    if (teamData) setTeam(teamData)
+    const { data: teamData } = await supabase
+      .from('organization_members')
+      .select('profiles(id, email, full_name)')
+      .eq('organization_id', orgId)
+    
+    if (teamData) {
+      setTeam(teamData.map((m: any) => m.profiles) as Profile[])
+    }
+    setIsLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [orgId])
 
   const fetchComments = async (ticketId: number) => {
     const { data } = await supabase
@@ -110,32 +134,78 @@ export default function TicketsPage() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+    const newUrls = [...attachmentUrls]
+
+    for (const file of Array.from(files)) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `${orgId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        toast.error(`Error uploading ${file.name}`)
+        continue
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath)
+
+      newUrls.push(publicUrl)
+    }
+
+    setAttachmentUrls(newUrls)
+    setIsUploading(false)
+  }
+
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     const newTicket = { 
+      organization_id: orgId,
       title, 
       description: description || null, 
       type, 
       priority, 
       status, 
-      assignee_id: assigneeId === 'unassigned' ? null : assigneeId 
+      assignee_id: assigneeId === 'unassigned' ? null : assigneeId,
+      attachment_urls: attachmentUrls
     }
     const { error } = await supabase.from('tickets').insert([newTicket])
     if (!error) {
       setTitle('')
       setDescription('') 
       setAssigneeId('unassigned')
+      setAttachmentUrls([])
       setIsModalOpen(false)
       fetchData() 
+      toast.success('Ticket created successfully')
+    } else {
+      toast.error('Failed to create ticket')
     }
   }
 
   const handleDrop = async (e: React.DragEvent, newStatus: string) => {
     e.preventDefault()
     if (!draggedTicketId) return
+    
+    const originalTickets = [...tickets]
     setTickets(tickets.map(t => t.id === draggedTicketId ? { ...t, status: newStatus } : t))
+    
     const { error } = await supabase.from('tickets').update({ status: newStatus }).eq('id', draggedTicketId)
-    if (error) fetchData() 
+    if (error) {
+      setTickets(originalTickets)
+      toast.error('Failed to update ticket status')
+    } else {
+      toast.success(`Moved to ${newStatus}`)
+    }
     setDraggedTicketId(null)
   }
 
@@ -252,7 +322,22 @@ export default function TicketsPage() {
               </div>
               
               <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-                {columnTickets.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-card/50 p-3 rounded-lg border border-border/50 space-y-3">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-4 w-8" />
+                      </div>
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <div className="flex justify-between items-center pt-2">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                      </div>
+                    </div>
+                  ))
+                ) : columnTickets.length === 0 ? (
                   <div className="h-20 border border-dashed border-border/60 rounded-lg flex items-center justify-center text-muted/40 text-[11px] font-medium italic">
                     No tickets in {column}
                   </div>
@@ -350,6 +435,35 @@ export default function TicketsPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Attachments Section */}
+                {selectedTicket.attachment_urls && selectedTicket.attachment_urls.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                      Attachments
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {selectedTicket.attachment_urls.map((url, i) => (
+                        <a 
+                          key={i} 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="group relative aspect-video rounded-lg border border-border overflow-hidden bg-accent/20 hover:border-primary/50 transition-all shadow-sm"
+                        >
+                          <img 
+                            src={url} 
+                            alt={`Attachment ${i + 1}`} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ImageIcon size={20} className="text-white" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4 pt-4 border-t border-border/20">
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-widest">Activity</h3>
@@ -467,7 +581,7 @@ export default function TicketsPage() {
                 />
               </div>
               
-              <div className="space-y-1.5">
+                <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Description (Markdown)</label>
                 <textarea 
                   value={description} 
@@ -505,7 +619,7 @@ export default function TicketsPage() {
                 </div>
               </div>
               
-              <div className="space-y-1.5 pb-2">
+              <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Assignee</label>
                 <select 
                   value={assigneeId} 
@@ -517,6 +631,46 @@ export default function TicketsPage() {
                     <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2.5">
+                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1 flex items-center gap-2">
+                  <Paperclip size={12} /> Attachments
+                </label>
+                
+                <div className="grid grid-cols-4 gap-2">
+                  {attachmentUrls.map((url, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg border border-border overflow-hidden bg-accent/20 group">
+                      <img src={url} alt="upload preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => setAttachmentUrls(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <label className="aspect-square rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center cursor-pointer group">
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      multiple 
+                      accept="image/*" 
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                    />
+                    {isUploading ? (
+                      <Loader2 size={16} className="text-primary animate-spin" />
+                    ) : (
+                      <>
+                        <Plus size={16} className="text-muted group-hover:text-primary transition-colors" />
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-tighter mt-1 group-hover:text-primary transition-colors">Add Image</span>
+                      </>
+                    )}
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 shrink-0">

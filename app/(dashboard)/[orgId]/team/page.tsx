@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
   Users, 
@@ -13,6 +13,8 @@ import {
   ChevronRight,
   ExternalLink
 } from 'lucide-react'
+import { Skeleton } from '@/components/Skeleton'
+import InviteModal from '@/components/InviteModal'
 
 type Profile = {
   id: string
@@ -22,28 +24,40 @@ type Profile = {
   created_at: string
 }
 
-export default function TeamPage() {
+export default function TeamPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = useReact(params)
   const [team, setTeam] = useState<Profile[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    const fetchTeam = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: true })
+  const fetchTeam = async () => {
+    setIsLoading(true)
+    // Fetch profiles through organization_members
+    const { data, error } = await supabase
+      .from('organization_members')
+      .select(`
+        profiles (
+          id,
+          email,
+          full_name,
+          avatar_url,
+          created_at
+        )
+      `)
+      .eq('organization_id', orgId)
 
-      if (!error && data) {
-        setTeam(data)
-      } else if (error) {
-        console.error("Error fetching team:", error)
-      }
-      setIsLoading(false)
+    if (!error && data) {
+      setTeam(data.map((m: any) => m.profiles) as Profile[])
+    } else if (error) {
+      console.error("Error fetching team:", error)
     }
+    setIsLoading(false)
+  }
 
+  useEffect(() => {
     fetchTeam()
-  }, [])
+  }, [orgId])
 
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase()
@@ -56,10 +70,24 @@ export default function TeamPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Team Workspace</h1>
           <p className="text-muted text-sm mt-1">Manage developers and organization roles.</p>
         </div>
-        <button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
+        <button 
+          onClick={() => setIsInviteModalOpen(true)}
+          className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm"
+        >
           <UserPlus size={16} strokeWidth={2.5} /> Invite Member
         </button>
       </div>
+
+      {isInviteModalOpen && (
+        <InviteModal 
+          orgId={orgId} 
+          onClose={() => setIsInviteModalOpen(false)}
+          onInviteSent={() => {
+            fetchTeam()
+            setIsInviteModalOpen(false)
+          }}
+        />
+      )}
 
       <div className="flex flex-col md:flex-row gap-3 bg-card p-2 rounded-lg border border-border">
         <div className="flex-1 relative">
@@ -79,9 +107,27 @@ export default function TeamPage() {
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-16 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-2 border-transparent" />
-            <p className="mt-4 text-xs font-medium text-muted uppercase tracking-widest">Loading Roster...</p>
+          <div className="divide-y divide-border/40">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                  <div className="space-y-2 flex-1 max-w-[200px]">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+                <div className="hidden md:flex flex-1 justify-center">
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+                <div className="hidden md:block flex-1">
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex-1 flex justify-end">
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <>
