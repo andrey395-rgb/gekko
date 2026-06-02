@@ -502,7 +502,6 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                       <textarea
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
-                        onPaste={(e) => handlePaste(e, true)}
                         placeholder="Write a comment..."
                         className="w-full bg-accent/50 border border-border rounded-lg p-3 text-xs focus:ring-1 focus:ring-primary outline-none min-h-[80px] transition-all placeholder:text-muted/40"
                         required
