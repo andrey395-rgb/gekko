@@ -77,6 +77,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -102,6 +103,22 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
   }
 
   useEffect(() => { fetchData() }, [orgId])
+
+  useEffect(() => {
+    if (!isLoading && tickets.length > 0) {
+      const params = new URLSearchParams(window.location.search)
+      const idParam = params.get('id')
+      if (idParam) {
+        const ticketId = parseInt(idParam, 10)
+        const ticket = tickets.find(t => t.id === ticketId)
+        if (ticket && !selectedTicket) {
+          handleTicketClick(ticket)
+          // Clean up the URL so it doesn't re-open on refresh
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+      }
+    }
+  }, [isLoading, tickets, selectedTicket])
 
   const fetchComments = async (ticketId: number) => {
     const { data } = await supabase
@@ -444,12 +461,10 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                       {selectedTicket.attachment_urls.map((url, i) => (
-                        <a 
+                        <button 
                           key={i} 
-                          href={url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="group relative aspect-video rounded-lg border border-border overflow-hidden bg-accent/20 hover:border-primary/50 transition-all shadow-sm"
+                          onClick={() => setPreviewImageUrl(url)}
+                          className="group relative aspect-video rounded-lg border border-border overflow-hidden bg-accent/20 hover:border-primary/50 transition-all shadow-sm text-left"
                         >
                           <img 
                             src={url} 
@@ -459,7 +474,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ImageIcon size={20} className="text-white" />
                           </div>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -689,6 +704,27 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Lightbox Preview Modal */}
+      {previewImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200 backdrop-blur-md"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 text-white/50 hover:text-white p-2 hover:bg-white/10 rounded-full transition-all"
+            onClick={() => setPreviewImageUrl(null)}
+          >
+            <X size={32} />
+          </button>
+          <div className="relative max-w-full max-h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={previewImageUrl} 
+              alt="Preview" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
+            />
           </div>
         </div>
       )}
