@@ -10,6 +10,7 @@ import { Providers } from '@/components/Providers'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import OrganizationSelector from '@/components/OrganizationSelector'
 import NotificationCenter from '@/components/NotificationCenter'
+import { GeckoLogo } from '@/components/GeckoLogo'
 import { 
   LayoutDashboard, 
   Ticket, 
@@ -87,7 +88,7 @@ export default function RootLayout({
         onClick={() => setIsDrawerOpen(false)}
         className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors min-h-[44px] md:min-h-[36px] ${
           isActive 
-            ? 'bg-emerald-500/10 text-emerald-500 border-l-2 border-emerald-500 rounded-l-none' 
+            ? 'bg-purple-500/10 text-purple-500 border-l-2 border-purple-500 rounded-l-none' 
             : 'text-muted hover:text-foreground hover:bg-accent'
         }`}
       >
@@ -123,15 +124,15 @@ export default function RootLayout({
                 {/* Sidebar Header */}
                 <div className="h-[52px] flex items-center px-4 border-b border-border bg-accent/10">
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
-                      <Zap size={14} className="text-black fill-current" />
+                    <div className="w-6 h-6 bg-purple-500 rounded flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/20">
+                      <GeckoLogo size={14} className="text-black fill-current" />
                     </div>
                     <div className="flex flex-col overflow-hidden">
                       <span className="font-bold tracking-tight text-foreground md:hidden lg:block truncate text-xs">
                         {orgName ? orgName.toUpperCase() : 'GEKKO'}
                       </span>
                       {orgName && (
-                        <span className="text-[9px] text-emerald-500 font-bold tracking-widest md:hidden lg:block">TEAM WORKSPACE</span>
+                        <span className="text-[9px] text-purple-500 font-bold tracking-widest md:hidden lg:block">TEAM WORKSPACE</span>
                       )}
                     </div>
                   </div>
@@ -189,7 +190,7 @@ export default function RootLayout({
                   <div className="hidden sm:block">
                     <LogoutButton />
                   </div>
-                  <div className="w-7 h-7 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-xs font-bold text-emerald-500 shrink-0">
+                  <div className="w-7 h-7 bg-purple-500/10 border border-purple-500/20 rounded-full flex items-center justify-center text-xs font-bold text-purple-500 shrink-0">
                     {user.email?.[0].toUpperCase()}
                   </div>
                 </div>

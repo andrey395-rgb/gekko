@@ -241,7 +241,7 @@ export default function InviteModal({
                   onClick={handleCopyLink}
                   className="bg-card hover:bg-accent border border-border rounded-lg px-4 py-2 text-xs font-bold transition-all flex items-center gap-2 shrink-0 active:scale-95"
                 >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  {copied ? <Check size={14} className="text-purple-500" /> : <Copy size={14} />}
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>

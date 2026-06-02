@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Zap } from 'lucide-react'
+import { GeckoLogo } from '@/components/GeckoLogo'
 
 export default function RootPage() {
   const router = useRouter()
@@ -44,8 +44,8 @@ export default function RootPage() {
 
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-background text-foreground">
-      <div className="w-12 h-12 bg-emerald-500 rounded flex items-center justify-center animate-pulse mb-4">
-        <Zap size={24} className="text-black fill-current" />
+      <div className="w-12 h-12 bg-purple-500 rounded flex items-center justify-center animate-pulse mb-4">
+        <GeckoLogo size={24} className="text-black fill-current" />
       </div>
       <p className="text-sm font-medium text-muted animate-pulse">Initializing Workspace...</p>
     </div>

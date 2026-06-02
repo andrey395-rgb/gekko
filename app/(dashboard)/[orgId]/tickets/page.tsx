@@ -300,7 +300,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
           {(filterType !== 'All' || filterPriority !== 'All') && (
             <button 
               onClick={() => { setFilterType('All'); setFilterPriority('All') }} 
-              className="text-[11px] text-emerald-500 font-bold hover:underline px-2 shrink-0"
+              className="text-[11px] text-purple-500 font-bold hover:underline px-2 shrink-0"
             >
               CLEAR
             </button>
@@ -434,7 +434,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] uppercase font-bold text-muted tracking-widest">Status</span>
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> {selectedTicket.status}
+                        <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> {selectedTicket.status}
                       </div>
                     </div>
                   </div>

@@ -177,8 +177,8 @@ export default function TeamPage({ params }: { params: Promise<{ orgId: string }
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-500/80">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-purple-500/80">
+                          <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
                           ONLINE
                         </div>
                       </td>
@@ -224,8 +224,8 @@ export default function TeamPage({ params }: { params: Promise<{ orgId: string }
                       <div className="flex items-center gap-1">
                         <CalendarIcon size={10} /> {new Date(member.created_at).toLocaleDateString()}
                       </div>
-                      <div className="flex items-center gap-1 text-emerald-500">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> ONLINE
+                      <div className="flex items-center gap-1 text-purple-500">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500" /> ONLINE
                       </div>
                     </div>
                   </div>

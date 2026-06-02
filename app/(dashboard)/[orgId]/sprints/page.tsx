@@ -128,7 +128,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
             <div key={sprint.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden hover:border-primary/40 transition-all group">
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-500 uppercase">
+                  <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold text-purple-500 uppercase">
                     <Zap size={10} className="fill-current" /> Active
                   </div>
                   <button className="text-muted hover:text-foreground">
@@ -156,10 +156,10 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-muted">
                     <span>Overall Progress</span>
-                    <span className="text-emerald-500">0%</span>
+                    <span className="text-purple-500">0%</span>
                   </div>
                   <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-emerald-500 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: '0%' }}></div>
+                    <div className="bg-purple-500 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: '0%' }}></div>
                   </div>
                 </div>
               </div>

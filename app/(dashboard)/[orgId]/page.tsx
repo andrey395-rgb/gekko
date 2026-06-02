@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import StandupModule from '@/components/StandupModule'
+import { toast } from 'react-hot-toast'
 
 export default function DashboardPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = useReact(params)
@@ -168,11 +169,19 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
     timeoutRef.current = setTimeout(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .update({ personal_note: val })
           .eq('id', user.id)
-        setSaveStatus('saved')
+          .select()
+          
+        if (error || !data || data.length === 0) {
+          console.error("Error saving note:", error || "RLS policy blocked update")
+          toast.error("Failed to save note. Make sure the database schema is updated.")
+          setSaveStatus('idle')
+        } else {
+          setSaveStatus('saved')
+        }
       }
     }, 1000)
   }
@@ -238,11 +247,11 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
         </div>
         <button 
           onClick={() => setIsStandupPanelOpen(true)}
-          className="group relative bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 px-5 rounded-lg transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2 transform active:scale-95"
+          className="group relative bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 px-5 rounded-lg transition-all shadow-lg shadow-purple-900/20 flex items-center gap-2 transform active:scale-95"
         >
           <Calendar size={14} />
           Daily Standups
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse"></span>
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-400 border-2 border-slate-950 rounded-full animate-pulse"></span>
         </button>
       </div>
 
@@ -265,7 +274,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
               >
                 <ChevronLeft size={16} className="text-muted" />
               </button>
-              <Zap size={16} className="text-emerald-500" />
+              <Zap size={16} className="text-purple-500" />
               <h2 className="text-sm font-semibold text-foreground">
                 {activeSprint ? activeSprint.name : "Sprint Overview"}
               </h2>
@@ -278,7 +287,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
               </button>
             </div>
             {activeSprint && (
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
                 {sprintProgress.daysLeft > 0 ? `${sprintProgress.daysLeft} Days Remaining` : 'Ended'}
               </span>
             )}
@@ -301,11 +310,11 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-bold text-muted uppercase tracking-widest">
                     <span>Progress</span>
-                    <span className="text-emerald-500">{sprintProgress.percent}%</span>
+                    <span className="text-purple-500">{sprintProgress.percent}%</span>
                   </div>
                   <div className="h-2 w-full bg-accent rounded-full overflow-hidden border border-border/50">
                     <div 
-                      className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                      className="h-full bg-purple-500 transition-all duration-1000 ease-out"
                       style={{ width: `${sprintProgress.percent}%` }}
                     />
                   </div>
@@ -370,7 +379,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                     `}>
                       {day.dayNum}
                       {isSprintBoundary && !day.isToday && (
-                        <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-500" />
+                        <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-purple-500" />
                       )}
                     </div>
                   </div>
@@ -383,13 +392,13 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6 flex flex-col h-full">
-          {/* Developer Notes */}
+          {/* Personal Scratchpad */}
           <div className="bg-card rounded-lg border border-border shadow-sm flex-1 flex flex-col min-h-[400px] relative">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-accent/10 shrink-0">
-              <h2 className="text-sm font-semibold text-foreground">Developer Notes</h2>
+              <h2 className="text-sm font-semibold text-foreground">Personal Scratchpad</h2>
               <div className="text-[10px] text-muted font-medium flex items-center gap-1">
                 {saveStatus === 'saving' && <><Loader2 size={10} className="animate-spin" /> Saving</>}
-                {saveStatus === 'saved' && <><Check size={10} className="text-emerald-500" /> Saved</>}
+                {saveStatus === 'saved' && <><Check size={10} className="text-purple-500" /> Saved</>}
               </div>
             </div>
             <textarea
@@ -447,7 +456,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                       </div>
                     </div>
                     <div className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
-                      ticket.status === 'Closed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                      ticket.status === 'Closed' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
                       ticket.status === 'In Progress' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                       'bg-blue-500/10 text-blue-500 border-blue-500/20'
                     }`}>

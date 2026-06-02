@@ -76,7 +76,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
       </div>
     )
   }
@@ -105,7 +105,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
                   type="text"
                   value={orgData.name}
                   onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all"
                   required
                 />
               </div>
@@ -137,7 +137,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
                     placeholder="e.g. vercel"
                     value={orgData.github_owner}
                     onChange={(e) => setOrgData({ ...orgData, github_owner: e.target.value })}
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all"
                   />
                   <p className="text-[10px] text-muted-foreground">The user or organization name.</p>
                 </div>
@@ -151,7 +151,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
                     placeholder="e.g. next.js"
                     value={orgData.github_repo}
                     onChange={(e) => setOrgData({ ...orgData, github_repo: e.target.value })}
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all"
                   />
                   <p className="text-[10px] text-muted-foreground">The specific repository name.</p>
                 </div>
@@ -161,7 +161,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
 
           {message && (
             <div className={`p-4 rounded-md flex items-center gap-3 ${
-              message.type === 'success' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
+              message.type === 'success' ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
             }`}>
               {message.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
               <p className="text-sm font-medium">{message.text}</p>
@@ -172,7 +172,7 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
             <button
               type="submit"
               disabled={saving}
-              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-2 px-6 rounded-md transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+              className="bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-2 px-6 rounded-md transition-all flex items-center gap-2 shadow-lg shadow-purple-500/20"
             >
               {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
               Save Changes

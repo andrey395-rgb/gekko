@@ -3,7 +3,8 @@
 import { useState, useEffect, use as useReact } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Zap, Users, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react'
+import { Users, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react'
+import { GeckoLogo } from '@/components/GeckoLogo'
 import { toast } from 'react-hot-toast'
 
 export default function JoinPage({ params }: { params: Promise<{ inviteCode: string }> }) {
@@ -75,8 +76,8 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
     <div className="h-screen flex flex-col items-center justify-center bg-background p-6">
       <div className="max-w-md w-full space-y-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex justify-center">
-          <div className="w-20 h-20 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-500/20 relative">
-            <Zap size={40} className="text-black fill-current" />
+          <div className="w-20 h-20 bg-purple-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-purple-500/20 relative">
+            <GeckoLogo size={40} className="text-black fill-current" />
             <div className="absolute -right-2 -bottom-2 bg-background p-1.5 rounded-lg border border-border shadow-lg">
               <Users size={20} className="text-primary" />
             </div>
@@ -93,7 +94,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
         <div className="bg-card p-8 rounded-2xl border border-border shadow-xl space-y-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-lg text-left">
-              <ShieldCheck size={20} className="text-emerald-500 shrink-0" />
+              <ShieldCheck size={20} className="text-purple-500 shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Your Role</span>
                 <span className="text-xs font-bold text-foreground">Standard Member</span>
