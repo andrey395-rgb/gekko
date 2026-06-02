@@ -53,19 +53,22 @@ export default function SettingsPage({ params }: { params: Promise<{ orgId: stri
     setSaving(true)
     setMessage(null)
 
+    const trimmedData = {
+      name: orgData.name.trim(),
+      github_owner: orgData.github_owner.trim(),
+      github_repo: orgData.github_repo.trim()
+    }
+
     const { error } = await supabase
       .from('organizations')
-      .update({
-        name: orgData.name,
-        github_owner: orgData.github_owner,
-        github_repo: orgData.github_repo
-      })
+      .update(trimmedData)
       .eq('id', orgId)
 
     if (error) {
       setMessage({ type: 'error', text: 'Failed to update settings.' })
     } else {
       setMessage({ type: 'success', text: 'Settings updated successfully.' })
+      setOrgData(trimmedData)
     }
     setSaving(false)
   }

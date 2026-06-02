@@ -12,9 +12,11 @@ import {
   TrendingUp,
   ArrowRight,
   Ticket,
-  Tag
+  Tag,
+  Calendar
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
+import StandupModule from '@/components/StandupModule'
 
 export default function DashboardPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = useReact(params)
@@ -24,11 +26,13 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
     inProgress: 0,
     closed: 0,
     blockers: 0,
-    pullRequests: 0 
+    pullRequests: 0,
+    isConfigured: false
   })
 
   const [recentTickets, setRecentTickets] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isStandupPanelOpen, setIsStandupPanelOpen] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -73,21 +77,45 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
       }
 
       let prCount = 0
+      let prError = false
       if (orgConfig?.github_owner && orgConfig?.github_repo) {
         try {
-          const response = await fetch(`https://api.github.com/repos/${orgConfig.github_owner}/${orgConfig.github_repo}/pulls?state=open`)
+          const owner = orgConfig.github_owner.trim()
+          const repo = orgConfig.github_repo.trim()
+          
+          console.log(`Fetching PRs for ${owner}/${repo}...`)
+          
+          const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=open`, {
+            cache: 'no-store',
+            headers: {
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          })
+          
           if (response.ok) {
             const prs = await response.json()
             prCount = prs.length
+            console.log(`Found ${prCount} open PRs.`)
+          } else {
+            prError = true
+            if (response.status === 403) {
+              console.warn("GitHub API rate limit exceeded.")
+            } else {
+              console.warn(`GitHub API returned status: ${response.status}`)
+            }
           }
         } catch (err) {
+          prError = true
           console.error("Failed to fetch GitHub PRs:", err)
         }
+      } else {
+        console.log("GitHub integration not configured for this organization.")
       }
 
       setMetrics({
         ...ticketMetrics,
-        pullRequests: prCount
+        pullRequests: prCount,
+        isConfigured: !!(orgConfig?.github_owner && orgConfig?.github_repo)
       })
 
       setIsLoading(false)
@@ -102,17 +130,33 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
     { title: 'In Progress', value: metrics.inProgress, icon: Clock, color: 'text-amber-500' },
     { title: 'Closed', value: metrics.closed, icon: CheckCircle2, color: 'text-emerald-500' },
     { title: 'Active Blockers', value: metrics.blockers, icon: AlertCircle, color: 'text-red-500' },
-    { title: 'PRs Open', value: metrics.pullRequests, icon: GitPullRequest, color: 'text-purple-500' },
+    { 
+      title: 'PRs Open', 
+      value: metrics.isConfigured ? metrics.pullRequests : '—', 
+      icon: GitPullRequest, 
+      color: 'text-purple-500',
+      subtitle: metrics.isConfigured ? undefined : 'Setup required'
+    },
   ]
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-muted text-sm mt-1">Real-time overview of your development workspace.</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-muted text-sm mt-1">Real-time overview of your development workspace.</p>
+        </div>
+        <button 
+          onClick={() => setIsStandupPanelOpen(true)}
+          className="group relative bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 px-5 rounded-lg transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2 transform active:scale-95"
+        >
+          <Calendar size={14} />
+          Daily Standups
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse"></span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricCards.map((metric) => (
           <div 
             key={metric.title} 
@@ -130,11 +174,23 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                   {metric.value}
                 </span>
               )}
-              {!isLoading && <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><TrendingUp size={10} /> +0%</span>}
+              {!isLoading && (
+                metric.subtitle ? (
+                  <span className="text-[10px] text-muted-foreground italic">{metric.subtitle}</span>
+                ) : (
+                  <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><TrendingUp size={10} /> +0%</span>
+                )
+              )}
             </div>
           </div>
         ))}
-      </div>
+      </div> */}
+
+      <StandupModule 
+        orgId={orgId} 
+        isOpen={isStandupPanelOpen} 
+        onClose={() => setIsStandupPanelOpen(false)} 
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

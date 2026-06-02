@@ -100,7 +100,7 @@ export default function OrganizationSelector() {
               <button 
                 onClick={() => {
                   setIsOpen(false)
-                  router.push('/')
+                  router.push('/new')
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-xs text-muted hover:text-foreground hover:bg-accent rounded-lg transition-all text-left"
               >

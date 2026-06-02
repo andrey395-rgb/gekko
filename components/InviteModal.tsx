@@ -73,13 +73,13 @@ export default function InviteModal({
     return () => clearTimeout(timer)
   }, [search, supabase])
 
-  const handleDirectInvite = async (profileId: string) => {
-    // Check if already a member
+  const handleDirectInvite = async (invitedUser: Profile) => {
+    // 1. Check if already a member
     const { data: existing } = await supabase
       .from('organization_members')
       .select('id')
       .eq('organization_id', orgId)
-      .eq('profile_id', profileId)
+      .eq('profile_id', invitedUser.id)
       .single()
     
     if (existing) {
@@ -87,14 +87,37 @@ export default function InviteModal({
       return
     }
 
+    // 2. Check if already has a pending invite
+    const { data: pending } = await supabase
+      .from('invites')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('email', invitedUser.email)
+      .eq('status', 'pending')
+      .single()
+
+    if (pending) {
+      toast.error('Invite already pending for this user')
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
     const { error } = await supabase
-      .from('organization_members')
-      .insert([{ organization_id: orgId, profile_id: profileId, role: 'member' }])
+      .from('invites')
+      .insert([{ 
+        organization_id: orgId, 
+        inviter_id: session.user.id,
+        email: invitedUser.email,
+        role: 'member'
+      }])
 
     if (error) {
-      toast.error('Failed to add member')
+      toast.error('Failed to send invite')
+      console.error(error)
     } else {
-      toast.success('Member added successfully')
+      toast.success(`Invite sent to ${invitedUser.full_name || invitedUser.email}`)
       onInviteSent()
     }
   }
@@ -120,7 +143,7 @@ export default function InviteModal({
 
     if (error) {
       if (error.code === '23505') {
-        toast.error('Invite already sent to this email')
+        toast.error('Invite already pending for this email')
       } else {
         toast.error('Failed to send invite')
       }
@@ -183,10 +206,10 @@ export default function InviteModal({
                       </div>
                     </div>
                     <button 
-                      onClick={() => handleDirectInvite(user.id)}
-                      className="px-3 py-1 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-[10px] font-bold rounded-md transition-all border border-primary/20"
+                      onClick={() => handleDirectInvite(user)}
+                      className="px-3 py-1 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-[10px] font-bold rounded-md transition-all border border-primary/20 uppercase"
                     >
-                      ADD TO TEAM
+                      Invite
                     </button>
                   </div>
                 ))

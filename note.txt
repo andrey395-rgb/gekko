@@ -1,0 +1,27 @@
+  1. Direct PR-to-Ticket Linking (The "Current Roadmap" item)
+  This is the most common integration for tools like Jira or Linear.
+   * How it works: You add a database column to tickets (e.g., github_pr_url). In the UI, a developer can paste
+     the link to their PR directly onto the ticket modal.
+   * Value: The ticket UI can use the GitHub API to dynamically show the PR's status (Draft, Open, Merged,
+     Closed), who is reviewing it, and if CI checks are passing, right inside Gekko.
+
+  2. GitHub Webhooks (Automated Workflow)
+  Instead of polling the API from the frontend, Gekko could listen for events pushed from GitHub.
+   * How it works: You set up a Next.js API Route (e.g., /api/webhooks/github). In GitHub, you configure it to
+     send a payload whenever a PR is created or merged.
+   * Value: If a developer creates a PR and puts Fixes Gekko-123 in the description, the webhook can catch that
+     and automatically move Ticket #123 from "In Progress" to "Review" on your Kanban board.
+
+  3. GitHub Authentication (OAuth)
+  Replacing the email/password login with a "Sign in with GitHub" button.
+   * How it works: Supabase Auth natively supports GitHub OAuth. You configure the keys in the Supabase
+     Dashboard.
+   * Value: It removes friction for developers signing up, and it allows Gekko to request a secure "Access Token"
+     from the user. With that token, Gekko can perform actions on behalf of the user, like commenting on PRs or
+     reading private repositories.
+
+  4. Branch Generation
+   * How it works: When a developer clicks a "Start Work" button on a ticket, Gekko uses a GitHub Access Token
+     (from OAuth) to automatically create a new branch in the repository formatted as
+     feature/ticket-ID-brief-description.
+   * Value: Standardizes branch naming conventions across the team and saves context-switching time.

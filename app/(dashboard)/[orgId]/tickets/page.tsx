@@ -15,7 +15,10 @@ import {
   AlertTriangle,
   ChevronRight,
   GripVertical,
-  Clock
+  Clock,
+  Paperclip,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import { toast } from 'react-hot-toast'
@@ -35,6 +38,7 @@ type Ticket = {
   status: string
   assignee_id: string | null
   organization_id: string
+  attachment_urls?: string[]
 }
 
 type Comment = {
@@ -58,6 +62,8 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
   const [priority, setPriority] = useState('Medium')
   const [status, setStatus] = useState('Open')
   const [assigneeId, setAssigneeId] = useState<string>('unassigned')
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [team, setTeam] = useState<Profile[]>([])
@@ -128,21 +134,56 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+    const newUrls = [...attachmentUrls]
+
+    for (const file of Array.from(files)) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `${orgId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        toast.error(`Error uploading ${file.name}`)
+        continue
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath)
+
+      newUrls.push(publicUrl)
+    }
+
+    setAttachmentUrls(newUrls)
+    setIsUploading(false)
+  }
+
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     const newTicket = { 
+      organization_id: orgId,
       title, 
       description: description || null, 
       type, 
       priority, 
       status, 
-      assignee_id: assigneeId === 'unassigned' ? null : assigneeId 
+      assignee_id: assigneeId === 'unassigned' ? null : assigneeId,
+      attachment_urls: attachmentUrls
     }
     const { error } = await supabase.from('tickets').insert([newTicket])
     if (!error) {
       setTitle('')
       setDescription('') 
       setAssigneeId('unassigned')
+      setAttachmentUrls([])
       setIsModalOpen(false)
       fetchData() 
       toast.success('Ticket created successfully')
@@ -395,6 +436,35 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                   </div>
                 </div>
 
+                {/* Attachments Section */}
+                {selectedTicket.attachment_urls && selectedTicket.attachment_urls.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                      Attachments
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {selectedTicket.attachment_urls.map((url, i) => (
+                        <a 
+                          key={i} 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="group relative aspect-video rounded-lg border border-border overflow-hidden bg-accent/20 hover:border-primary/50 transition-all shadow-sm"
+                        >
+                          <img 
+                            src={url} 
+                            alt={`Attachment ${i + 1}`} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ImageIcon size={20} className="text-white" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4 pt-4 border-t border-border/20">
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-widest">Activity</h3>
                   <div className="space-y-4">
@@ -432,6 +502,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                       <textarea
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
+                        onPaste={(e) => handlePaste(e, true)}
                         placeholder="Write a comment..."
                         className="w-full bg-accent/50 border border-border rounded-lg p-3 text-xs focus:ring-1 focus:ring-primary outline-none min-h-[80px] transition-all placeholder:text-muted/40"
                         required
@@ -511,7 +582,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                 />
               </div>
               
-              <div className="space-y-1.5">
+                <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Description (Markdown)</label>
                 <textarea 
                   value={description} 
@@ -549,7 +620,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                 </div>
               </div>
               
-              <div className="space-y-1.5 pb-2">
+              <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Assignee</label>
                 <select 
                   value={assigneeId} 
@@ -561,6 +632,46 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                     <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2.5">
+                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1 flex items-center gap-2">
+                  <Paperclip size={12} /> Attachments
+                </label>
+                
+                <div className="grid grid-cols-4 gap-2">
+                  {attachmentUrls.map((url, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg border border-border overflow-hidden bg-accent/20 group">
+                      <img src={url} alt="upload preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => setAttachmentUrls(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <label className="aspect-square rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center cursor-pointer group">
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      multiple 
+                      accept="image/*" 
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                    />
+                    {isUploading ? (
+                      <Loader2 size={16} className="text-primary animate-spin" />
+                    ) : (
+                      <>
+                        <Plus size={16} className="text-muted group-hover:text-primary transition-colors" />
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-tighter mt-1 group-hover:text-primary transition-colors">Add Image</span>
+                      </>
+                    )}
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 shrink-0">

@@ -9,6 +9,7 @@ import LogoutButton from '@/components/LogoutButton'
 import { Providers } from '@/components/Providers'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import OrganizationSelector from '@/components/OrganizationSelector'
+import NotificationCenter from '@/components/NotificationCenter'
 import { 
   LayoutDashboard, 
   Ticket, 
@@ -174,19 +175,21 @@ export default function RootLayout({
                   >
                     <Menu size={20} />
                   </button>
-                  <div className="flex items-center gap-2 text-muted text-xs md:text-sm font-medium">
+                  <div className="flex items-center gap-3 text-muted text-xs md:text-sm font-medium">
                     <OrganizationSelector />
-                    <ChevronRight size={14} />
-                    <span className="text-foreground capitalize">{pathname.split('/')[orgId ? 2 : 1] || 'Dashboard'}</span>
+                    <ChevronRight size={14} className="opacity-50 shrink-0" />
+                    <span className="text-foreground capitalize truncate max-w-[100px]">{pathname.split('/')[orgId ? 2 : 1] || 'Dashboard'}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <NotificationCenter />
+                  <div className="w-px h-4 bg-border/50 mx-1 hidden sm:block" />
                   <ThemeToggle />
                   <div className="hidden sm:block">
                     <LogoutButton />
                   </div>
-                  <div className="w-7 h-7 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-xs font-bold text-emerald-500">
+                  <div className="w-7 h-7 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-xs font-bold text-emerald-500 shrink-0">
                     {user.email?.[0].toUpperCase()}
                   </div>
                 </div>
