@@ -51,7 +51,7 @@ export default function CalendarPage({ params }: { params: Promise<{ orgId: stri
 
     if (today < start) return { label: 'Upcoming', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' }
     if (today > end) return { label: 'Past', color: 'text-muted bg-accent border-border' }
-    return { label: 'Active', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }
+    return { label: 'Active', color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' }
   }
 
   const getDaysRemaining = (endDate: string) => {

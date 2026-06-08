@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Zap, Building2, ArrowRight, Loader2, Sparkles } from 'lucide-react'
+import { Building2, ArrowRight, Loader2, Sparkles } from 'lucide-react'
+import { GeckoLogo } from '@/components/GeckoLogo'
 import { toast } from 'react-hot-toast'
 
 export default function NewWorkspacePage() {
@@ -59,7 +60,7 @@ export default function NewWorkspacePage() {
       <div className="w-full max-w-[400px] space-y-10">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="w-12 h-12 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center text-primary shadow-lg shadow-primary/5">
-            <Zap size={24} strokeWidth={2.5} />
+            <GeckoLogo size={24} />
           </div>
           <div className="space-y-1">
             <h1 className="text-xl font-bold tracking-tight text-foreground">Create a new workspace</h1>

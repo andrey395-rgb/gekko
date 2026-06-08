@@ -116,7 +116,7 @@ export default function NotificationCenter() {
       >
         <Bell size={18} />
         {invites.length > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 border-2 border-background rounded-full" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-purple-500 border-2 border-background rounded-full" />
         )}
       </button>
 
@@ -127,7 +127,7 @@ export default function NotificationCenter() {
             <div className="px-4 py-3 border-b border-border bg-accent/10 flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-widest text-foreground">Notifications</span>
               {invites.length > 0 && (
-                <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-purple-500/10 text-purple-500 px-2 py-0.5 rounded-full">
                   {invites.length} NEW
                 </span>
               )}
