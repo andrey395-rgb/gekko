@@ -77,7 +77,6 @@ export default function RootLayout({
     { label: 'Tickets', href: `/${orgId}/tickets`, icon: Ticket },
     { label: 'Sprints', href: `/${orgId}/sprints`, icon: Zap },
     { label: 'Team', href: `/${orgId}/team`, icon: Users },
-    { label: 'Calendar', href: `/${orgId}/calendar`, icon: Calendar },
   ] : []
 
   const SidebarItem = ({ item, collapsed = false }: { item: any, collapsed?: boolean }) => {

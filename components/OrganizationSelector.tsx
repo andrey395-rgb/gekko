@@ -73,7 +73,13 @@ export default function OrganizationSelector() {
                       key={org.id}
                       onClick={() => {
                         setIsOpen(false)
-                        router.push(`/${org.id}`)
+                        const segments = pathname.split('/')
+                        if (currentOrgId && segments[1] === currentOrgId) {
+                          segments[1] = org.id
+                          router.push(segments.join('/'))
+                        } else {
+                          router.push(`/${org.id}`)
+                        }
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg transition-all text-left group mb-0.5 ${
                         isActive 

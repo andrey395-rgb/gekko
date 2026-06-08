@@ -18,7 +18,8 @@ import {
   Clock,
   Paperclip,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  ArrowRightLeft
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import { toast } from 'react-hot-toast'
@@ -79,7 +80,20 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
   const [newComment, setNewComment] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
+  const [user, setUser] = useState<any>(null)
+  const [transferMessage, setTransferMessage] = useState('')
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [transferTargetId, setTransferTargetId] = useState<string>('')
+
   const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -149,6 +163,67 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
       setNewComment('')
       fetchComments(selectedTicket.id)
     }
+  }
+
+  const handleClaimTicket = async () => {
+    if (!selectedTicket || !user) return
+    const { error } = await supabase
+      .from('tickets')
+      .update({ assignee_id: user.id })
+      .eq('id', selectedTicket.id)
+
+    if (error) {
+      toast.error('Failed to claim ticket')
+    } else {
+      toast.success('Ticket claimed!')
+      setSelectedTicket({ ...selectedTicket, assignee_id: user.id })
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, assignee_id: user.id } : t))
+    }
+  }
+
+  const handleUnassignTicket = async () => {
+    if (!selectedTicket) return
+    const { error } = await supabase
+      .from('tickets')
+      .update({ assignee_id: null })
+      .eq('id', selectedTicket.id)
+
+    if (error) {
+      toast.error('Failed to unassign')
+    } else {
+      toast.success('Unassigned from ticket')
+      setSelectedTicket({ ...selectedTicket, assignee_id: null })
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, assignee_id: null } : t))
+    }
+  }
+
+  const handleInitiateTransfer = async () => {
+    if (!selectedTicket || !user || !transferTargetId) {
+      toast.error('Please select a teammate')
+      return
+    }
+    setIsTransferring(true)
+    const { error } = await supabase
+      .from('ticket_transfers')
+      .insert([{
+        ticket_id: selectedTicket.id,
+        from_user_id: user.id,
+        to_user_id: transferTargetId,
+        message: transferMessage || null
+      }])
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('A transfer request is already pending for this ticket')
+      } else {
+        toast.error('Failed to send transfer request')
+      }
+    } else {
+      toast.success('Transfer request sent!')
+      setTransferMessage('')
+      setTransferTargetId('')
+    }
+    setIsTransferring(false)
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -541,13 +616,66 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border ${selectedTicket.assignee_id ? 'bg-primary/10 text-primary border-primary/20 shadow-[0_0_10px_rgba(62,207,142,0.1)]' : 'bg-accent text-muted/40 border-border border-dashed'}`}>
                       {getAssigneeInitials(selectedTicket.assignee_id) || <UserIcon size={12} />}
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1">
                       <span className="text-xs font-bold text-foreground">
                         {team.find(m => m.id === selectedTicket.assignee_id)?.full_name || team.find(m => m.id === selectedTicket.assignee_id)?.email || 'Unassigned'}
                       </span>
                       <span className="text-[10px] text-muted">Core Contributor</span>
                     </div>
                   </div>
+
+                  {/* Self-assignment / Unassignment */}
+                  {selectedTicket.assignee_id === null ? (
+                    <button 
+                      onClick={handleClaimTicket}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all border border-primary/20"
+                    >
+                      <UserIcon size={14} /> Claim This Ticket
+                    </button>
+                  ) : selectedTicket.assignee_id === user?.id ? (
+                    <button 
+                      onClick={handleUnassignTicket}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-all border border-red-500/20"
+                    >
+                      <X size={14} /> Unassign Me
+                    </button>
+                  ) : null}
+
+                  {/* Delegation UI */}
+                  {selectedTicket.assignee_id === user?.id && (
+                    <div className="pt-4 space-y-3 border-t border-border/20">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] uppercase font-bold text-muted tracking-widest">Delegate Ticket</h3>
+                        <ArrowRightLeft size={12} className="text-muted/40" />
+                      </div>
+                      <div className="space-y-2">
+                        <select 
+                          value={transferTargetId}
+                          onChange={(e) => setTransferTargetId(e.target.value)}
+                          className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none"
+                        >
+                          <option value="">Select teammate...</option>
+                          {team.filter(m => m.id !== user?.id).map(member => (
+                            <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
+                          ))}
+                        </select>
+                        <textarea 
+                          value={transferMessage}
+                          onChange={(e) => setTransferMessage(e.target.value)}
+                          placeholder="Add an optional message..."
+                          className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none min-h-[60px] resize-none placeholder:text-muted/40"
+                        />
+                        <button 
+                          onClick={handleInitiateTransfer}
+                          disabled={isTransferring || !transferTargetId}
+                          className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-emerald-900/20"
+                        >
+                          {isTransferring ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          Send Transfer Request
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
