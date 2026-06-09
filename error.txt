@@ -1,0 +1,45 @@
+11:37:18.812 Running build in Washington, D.C., USA (East) – iad1
+11:37:18.812 Build machine configuration: 2 cores, 8 GB
+11:37:18.936 Cloning github.com/andrey395-rgb/gekko (Branch: ticket-pickup-reassign-system, Commit: 0439caf)
+11:37:19.184 Cloning completed: 248.000ms
+11:37:20.405 Restored build cache from previous deployment (3Qjs49QAY6Txu1A2N8YoxtL9J4gf)
+11:37:20.599 Running "vercel build"
+11:37:20.615 Vercel CLI 54.9.0
+11:37:20.840 Installing dependencies...
+11:37:21.889 
+11:37:21.890 up to date in 920ms
+11:37:21.890 
+11:37:21.891 213 packages are looking for funding
+11:37:21.891   run `npm fund` for details
+11:37:21.919 Detected Next.js version: 16.2.6
+11:37:21.924 Running "npm run build"
+11:37:22.023 
+11:37:22.024 > gekko@0.1.0 build
+11:37:22.024 > next build
+11:37:22.024 
+11:37:22.728   Applying modifyConfig from Vercel
+11:37:22.744 ▲ Next.js 16.2.6 (Turbopack)
+11:37:22.744 
+11:37:22.753 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+11:37:22.778   Creating an optimized production build ...
+11:37:32.394 ✓ Compiled successfully in 9.3s
+11:37:32.397   Running TypeScript ...
+11:37:38.004 Failed to type check.
+11:37:38.005 
+11:37:38.005 ./components/NotificationCenter.tsx:105:22
+11:37:38.005 Type error: Conversion of type '({ type: "invite"; id: any; organization_id: any; role: any; organizations: { name: any; }[]; } | { type: "transfer"; id: any; ticket_id: any; message: any; expires_at: any; from_profile: { full_name: any; email: any; }[]; tickets: { ...; }[]; })[]' to type 'Notification[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+11:37:38.006   Type '{ type: "invite"; id: any; organization_id: any; role: any; organizations: { name: any; }[]; } | { type: "transfer"; id: any; ticket_id: any; message: any; expires_at: any; from_profile: { full_name: any; email: any; }[]; tickets: { ...; }[]; }' is not comparable to type 'Notification'.
+11:37:38.006     Type '{ type: "transfer"; id: any; ticket_id: any; message: any; expires_at: any; from_profile: { full_name: any; email: any; }[]; tickets: { title: any; }[]; }' is not comparable to type 'Notification'.
+11:37:38.006       Type '{ type: "transfer"; id: any; ticket_id: any; message: any; expires_at: any; from_profile: { full_name: any; email: any; }[]; tickets: { title: any; }[]; }' is not comparable to type 'Transfer'.
+11:37:38.006         Types of property 'from_profile' are incompatible.
+11:37:38.006           Type '{ full_name: any; email: any; }[]' is missing the following properties from type '{ full_name: string | null; email: string; }': full_name, email
+11:37:38.007 
+11:37:38.007   103 |     const transfers = (transfersData || []).map(t => ({ ...t, type: 'transfer' as const }))
+11:37:38.007   104 |
+11:37:38.007 > 105 |     setNotifications([...invites, ...transfers] as Notification[])
+11:37:38.007       |                      ^
+11:37:38.007   106 |   }
+11:37:38.007   107 |
+11:37:38.007   108 |   const handleAcceptInvite = async (inviteId: string) => {
+11:37:38.038 Next.js build worker exited with code: 1 and signal: null
+11:37:38.085 Error: Command "npm run build" exited with 1che

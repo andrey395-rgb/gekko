@@ -99,10 +99,20 @@ export default function NotificationCenter() {
       .eq('to_user_id', user.id)
       .eq('status', 'pending')
 
-    const invites = (invitesData || []).map(i => ({ ...i, type: 'invite' as const }))
-    const transfers = (transfersData || []).map(t => ({ ...t, type: 'transfer' as const }))
+    const invites = (invitesData || []).map(i => ({ 
+      ...i, 
+      type: 'invite' as const,
+      organizations: Array.isArray(i.organizations) ? i.organizations[0] : i.organizations
+    })) as Invite[]
 
-    setNotifications([...invites, ...transfers] as Notification[])
+    const transfers = (transfersData || []).map(t => ({ 
+      ...t, 
+      type: 'transfer' as const,
+      from_profile: Array.isArray(t.from_profile) ? t.from_profile[0] : t.from_profile,
+      tickets: Array.isArray(t.tickets) ? t.tickets[0] : t.tickets
+    })) as Transfer[]
+
+    setNotifications([...invites, ...transfers])
   }
 
   const handleAcceptInvite = async (inviteId: string) => {

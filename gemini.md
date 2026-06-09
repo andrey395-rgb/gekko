@@ -21,7 +21,10 @@ The application heavily utilizes Next.js Client Components (`"use client"`) for 
 * **Ticket Detail Engine:**
   * Modal-based ticket viewing.
   * Markdown-supported ticket descriptions and relational comment threads.
-* **Sprint Planning (`/sprints` & `/calendar`):** * Sprint creation and timeline visualization with date-math logic.
+* **Sprint Planning (`/sprints`):** 
+  * Unified management and visualization hub.
+  * Features a "Grid View" for sprint creation/progress and a "Timeline View" for roadmap visualization.
+  * Interactive sprint creation with date-math logic.
 * **Team Management (`/team`):** * Roster view and ticket assignment via explicit foreign keys.
 * **Dashboard (`/`):** * Aggregated ticket metrics and live GitHub API fetching for Open PR counts.
 

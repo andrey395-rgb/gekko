@@ -25,6 +25,7 @@ type Sprint = {
   start_date: string
   end_date: string
   organization_id: string
+  tickets: { status: string }[]
 }
 
 export default function SprintsPage({ params }: { params: Promise<{ orgId: string }> }) {
@@ -45,7 +46,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
     setIsLoading(true)
     const { data, error } = await supabase
       .from('sprints')
-      .select('*')
+      .select('*, tickets(status)')
       .eq('organization_id', orgId)
       .order('start_date', { ascending: view === 'timeline' })
 
@@ -53,7 +54,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
       console.error('Error fetching sprints:', error)
       toast.error('Failed to load sprints')
     } else if (data) {
-      setSprints(data)
+      setSprints(data as any)
     }
     setIsLoading(false)
   }
@@ -200,11 +201,22 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                     
                     <div className="space-y-2 pt-2">
                       <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-muted">
-                        <span>Overall Progress</span>
-                        <span className="text-purple-500">0%</span>
+                        <span>Overall Progress ({sprint.tickets?.length || 0} tickets)</span>
+                        <span className="text-purple-500">
+                          {sprint.tickets?.length > 0 
+                            ? Math.round((sprint.tickets.filter(t => t.status === 'Closed').length / sprint.tickets.length) * 100) 
+                            : 0}%
+                        </span>
                       </div>
                       <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-purple-500 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: '0%' }}></div>
+                        <div 
+                          className="bg-purple-500 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)] transition-all duration-500" 
+                          style={{ 
+                            width: `${sprint.tickets?.length > 0 
+                              ? Math.round((sprint.tickets.filter(t => t.status === 'Closed').length / sprint.tickets.length) * 100) 
+                              : 0}%` 
+                          }}
+                        ></div>
                       </div>
                     </div>
                   </div>
@@ -292,6 +304,16 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                           <span className={`text-[11px] font-bold ${isActive ? 'text-primary' : 'text-muted'}`}>
                             {isActive ? `${getDaysRemaining(sprint.end_date)} DAYS REMAINING` : status.label === 'Past' ? 'COMPLETED' : 'PENDING START'}
                           </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                           <span className="text-[10px] font-bold text-muted border border-border px-1.5 py-0.5 rounded uppercase">
+                             {sprint.tickets?.length || 0} Tickets
+                           </span>
+                           <span className="text-[10px] font-bold text-purple-500 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase">
+                             {sprint.tickets?.length > 0 
+                               ? Math.round((sprint.tickets.filter(t => t.status === 'Closed').length / sprint.tickets.length) * 100) 
+                               : 0}% Done
+                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 ml-auto">
                           <span className="text-[10px] font-bold text-muted hover:text-foreground cursor-pointer flex items-center gap-1 transition-colors">
