@@ -86,8 +86,8 @@ function TicketSelect({ children, className = '', variant = 'default', ...props 
   )
 }
 
-export default function TicketsPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+export default function TicketsPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
   const columns = ['Open', 'In Progress', 'Review', 'Closed']
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -138,7 +138,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     const { data: ticketsData } = await supabase
       .from('tickets')
       .select('*')
-      .eq('organization_id', orgId)
+      .eq('project_id', projectId)
       .order('created_at', { ascending: false })
     
     if (ticketsData) setTickets(ticketsData)
@@ -155,7 +155,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     const { data: sprintsData } = await supabase
       .from('sprints')
       .select('id, name')
-      .eq('organization_id', orgId)
+      .eq('project_id', projectId)
       .order('start_date', { ascending: false })
     
     if (sprintsData) setSprints(sprintsData)
@@ -163,7 +163,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     setIsLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [orgId])
+  useEffect(() => { fetchData() }, [orgId, projectId])
 
   useEffect(() => {
     if (!isLoading && tickets.length > 0) {
@@ -387,6 +387,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     e.preventDefault()
     const newTicket = { 
       organization_id: orgId,
+      project_id: projectId,
       title, 
       description: description || null, 
       type, 

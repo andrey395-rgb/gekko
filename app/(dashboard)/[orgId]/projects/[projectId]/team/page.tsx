@@ -24,8 +24,8 @@ type Profile = {
   created_at: string
 }
 
-export default function TeamPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+export default function TeamPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
   const [team, setTeam] = useState<Profile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)

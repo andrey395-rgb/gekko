@@ -28,8 +28,8 @@ type Sprint = {
   tickets: { status: string }[]
 }
 
-export default function SprintsPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+export default function SprintsPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -47,7 +47,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
     const { data, error } = await supabase
       .from('sprints')
       .select('*, tickets(status)')
-      .eq('organization_id', orgId)
+      .eq('project_id', projectId)
       .order('start_date', { ascending: view === 'timeline' })
 
     if (error) {
@@ -61,7 +61,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
 
   useEffect(() => {
     fetchSprints()
-  }, [orgId, view])
+  }, [orgId, projectId, view])
 
   const handleCreateSprint = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,7 +73,8 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
         goal: goal || null,
         start_date: startDate, 
         end_date: endDate,
-        organization_id: orgId
+        organization_id: orgId,
+        project_id: projectId
       }])
 
     if (error) {
