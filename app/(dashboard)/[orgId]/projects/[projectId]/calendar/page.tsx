@@ -21,8 +21,8 @@ type Sprint = {
   organization_id: string
 }
 
-export default function CalendarPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+export default function CalendarPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()

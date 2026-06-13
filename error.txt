@@ -1,0 +1,61 @@
+## Error Type
+Build Error
+
+## Error Message
+Export Github doesn't exist in target module
+
+## Build Output
+./Desktop/gekko/app/(dashboard)/[orgId]/settings/page.tsx:5:1
+Export Github doesn't exist in target module
+   3 | import { useState, useEffect, use as useReact } from 'react'
+   4 | import { createClient } from '@/utils/supabase/client'
+>  5 | import { 
+     | ^^^^^^^^
+>  6 |   Settings, 
+     | ^^^^^^^^^^^^
+>  7 |   GitPullRequest, 
+     | ^^^^^^^^^^^^^^^^^^
+>  8 |   Save, 
+     | ^^^^^^^^
+>  9 |   CheckCircle2, 
+     | ^^^^^^^^^^^^^^^^
+> 10 |   AlertCircle,
+     | ^^^^^^^^^^^^^^
+> 11 |   Loader2,
+     | ^^^^^^^^^^
+> 12 |   Building2,
+     | ^^^^^^^^^^^^
+> 13 |   Users,
+     | ^^^^^^^^
+> 14 |   Shield,
+     | ^^^^^^^^^
+> 15 |   Trash2,
+     | ^^^^^^^^^
+> 16 |   UserPlus,
+     | ^^^^^^^^^^^
+> 17 |   Github,
+     | ^^^^^^^^^
+> 18 |   Link2,
+     | ^^^^^^^^
+> 19 |   Unlink2
+     | ^^^^^^^^^
+> 20 | } from 'lucide-react'
+     | ^^^^^^^^^^^^^^^^^^^^^
+  21 | import { toast } from 'react-hot-toast'
+  22 | import InviteModal from '@/components/InviteModal'
+  23 |
+
+The export Github was not found in module [project]/Desktop/gekko/node_modules/lucide-react/dist/esm/lucide-react.mjs [app-client] (ecmascript).
+Did you mean to import Gift?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/gekko/app/(dashboard)/[orgId]/settings/page.tsx [Client Component Browser]
+    ./Desktop/gekko/app/(dashboard)/[orgId]/settings/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/gekko/app/(dashboard)/[orgId]/settings/page.tsx [Client Component SSR]
+    ./Desktop/gekko/app/(dashboard)/[orgId]/settings/page.tsx [Server Component]
+
+Next.js version: 16.2.6 (Turbopack)

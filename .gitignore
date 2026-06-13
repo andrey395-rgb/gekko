@@ -10,7 +10,6 @@
 !.yarn/releases
 !.yarn/versions
 GekkoSpecs.pdf
-error.txt
 # testing
 /coverage
 

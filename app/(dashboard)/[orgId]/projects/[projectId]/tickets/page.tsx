@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, use as useReact } from 'react'
+import type { ReactNode, SelectHTMLAttributes } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import { 
@@ -18,7 +19,8 @@ import {
   Clock,
   Paperclip,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  ArrowRightLeft
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import { toast } from 'react-hot-toast'
@@ -37,8 +39,15 @@ type Ticket = {
   priority: string
   status: string
   assignee_id: string | null
+  sprint_id: number | null
   organization_id: string
   attachment_urls?: string[]
+}
+
+type Sprint = {
+  id: number
+  name: string
+  status?: string
 }
 
 type Comment = {
@@ -51,8 +60,34 @@ type Comment = {
   }
 }
 
-export default function TicketsPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+type TicketSelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
+  children: ReactNode
+  variant?: 'compact' | 'default'
+}
+
+function TicketSelect({ children, className = '', variant = 'default', ...props }: TicketSelectProps) {
+  const sizeClass = variant === 'compact'
+    ? 'py-1.5 pl-2.5 pr-8 text-[12px] rounded-md'
+    : 'py-2.5 pl-3 pr-9 text-sm rounded-lg'
+
+  return (
+    <div className={`relative group ${className}`}>
+      <select
+        {...props}
+        className={`w-full bg-accent/50 border border-border text-foreground font-medium ${sizeClass} focus:ring-1 focus:ring-primary focus:border-primary/60 outline-none appearance-none cursor-pointer hover:bg-accent transition-colors shadow-sm [&>option]:bg-card [&>option]:text-foreground`}
+      >
+        {children}
+      </select>
+      <ChevronRight
+        size={variant === 'compact' ? 10 : 14}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-muted pointer-events-none group-hover:text-primary transition-colors"
+      />
+    </div>
+  )
+}
+
+export default function TicketsPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
   const columns = ['Open', 'In Progress', 'Review', 'Closed']
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -62,31 +97,48 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
   const [priority, setPriority] = useState('Medium')
   const [status, setStatus] = useState('Open')
   const [assigneeId, setAssigneeId] = useState<string>('unassigned')
+  const [sprintId, setSprintId] = useState<string>('none')
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
   
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [team, setTeam] = useState<Profile[]>([])
+  const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null)
   
   const [filterType, setFilterType] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
+  const [filterSprintId, setFilterSprintId] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [selectedTicketIds, setSelectedTicketIds] = useState<number[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
+  const [user, setUser] = useState<any>(null)
+  const [transferMessage, setTransferMessage] = useState('')
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [transferTargetId, setTransferTargetId] = useState<string>('')
+
   const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [])
 
   const fetchData = async () => {
     setIsLoading(true)
     const { data: ticketsData } = await supabase
       .from('tickets')
       .select('*')
-      .eq('organization_id', orgId)
+      .eq('project_id', projectId)
       .order('created_at', { ascending: false })
     
     if (ticketsData) setTickets(ticketsData)
@@ -99,10 +151,19 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     if (teamData) {
       setTeam(teamData.map((m: any) => m.profiles) as Profile[])
     }
+
+    const { data: sprintsData } = await supabase
+      .from('sprints')
+      .select('id, name')
+      .eq('project_id', projectId)
+      .order('start_date', { ascending: false })
+    
+    if (sprintsData) setSprints(sprintsData)
+
     setIsLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [orgId])
+  useEffect(() => { fetchData() }, [orgId, projectId])
 
   useEffect(() => {
     if (!isLoading && tickets.length > 0) {
@@ -134,6 +195,84 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     fetchComments(ticket.id)
   }
 
+  const toggleTicketSelection = (ticketId: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setSelectedTicketIds(prev => 
+      prev.includes(ticketId) 
+        ? prev.filter(id => id !== ticketId) 
+        : [...prev, ticketId]
+    )
+  }
+
+  const handleBulkSprintUpdate = async (newSprintId: string) => {
+    if (selectedTicketIds.length === 0) return
+    const sprintVal = newSprintId === 'none' ? null : parseInt(newSprintId)
+    
+    const { error } = await supabase
+      .from('tickets')
+      .update({ sprint_id: sprintVal })
+      .in('id', selectedTicketIds)
+
+    if (error) {
+      toast.error('Failed to bulk update sprint')
+    } else {
+      toast.success(`Updated ${selectedTicketIds.length} tickets`)
+      setTickets(tickets.map(t => selectedTicketIds.includes(t.id) ? { ...t, sprint_id: sprintVal } : t))
+      setSelectedTicketIds([])
+    }
+  }
+
+  const handleBulkStatusUpdate = async (newStatus: string) => {
+    if (selectedTicketIds.length === 0) return
+    
+    const { error } = await supabase
+      .from('tickets')
+      .update({ status: newStatus })
+      .in('id', selectedTicketIds)
+
+    if (error) {
+      toast.error('Failed to bulk update status')
+    } else {
+      toast.success(`Updated ${selectedTicketIds.length} tickets`)
+      setTickets(tickets.map(t => selectedTicketIds.includes(t.id) ? { ...t, status: newStatus } : t))
+      setSelectedTicketIds([])
+    }
+  }
+
+  const handleBulkPriorityUpdate = async (newPriority: string) => {
+    if (selectedTicketIds.length === 0) return
+    
+    const { error } = await supabase
+      .from('tickets')
+      .update({ priority: newPriority })
+      .in('id', selectedTicketIds)
+
+    if (error) {
+      toast.error('Failed to bulk update priority')
+    } else {
+      toast.success(`Updated ${selectedTicketIds.length} tickets`)
+      setTickets(tickets.map(t => selectedTicketIds.includes(t.id) ? { ...t, priority: newPriority } : t))
+      setSelectedTicketIds([])
+    }
+  }
+
+  const handleUpdateSprint = async (newSprintId: string) => {
+    if (!selectedTicket) return
+    const sprintVal = newSprintId === 'none' ? null : parseInt(newSprintId)
+    const { error } = await supabase
+      .from('tickets')
+      .update({ sprint_id: sprintVal })
+      .eq('id', selectedTicket.id)
+
+    if (error) {
+      toast.error('Failed to update sprint')
+    } else {
+      toast.success('Sprint updated')
+      setSelectedTicket({ ...selectedTicket, sprint_id: sprintVal })
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, sprint_id: sprintVal } : t))
+    }
+  }
+
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim() || !selectedTicket) return
@@ -149,6 +288,67 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
       setNewComment('')
       fetchComments(selectedTicket.id)
     }
+  }
+
+  const handleClaimTicket = async () => {
+    if (!selectedTicket || !user) return
+    const { error } = await supabase
+      .from('tickets')
+      .update({ assignee_id: user.id })
+      .eq('id', selectedTicket.id)
+
+    if (error) {
+      toast.error('Failed to claim ticket')
+    } else {
+      toast.success('Ticket claimed!')
+      setSelectedTicket({ ...selectedTicket, assignee_id: user.id })
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, assignee_id: user.id } : t))
+    }
+  }
+
+  const handleUnassignTicket = async () => {
+    if (!selectedTicket) return
+    const { error } = await supabase
+      .from('tickets')
+      .update({ assignee_id: null })
+      .eq('id', selectedTicket.id)
+
+    if (error) {
+      toast.error('Failed to unassign')
+    } else {
+      toast.success('Unassigned from ticket')
+      setSelectedTicket({ ...selectedTicket, assignee_id: null })
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, assignee_id: null } : t))
+    }
+  }
+
+  const handleInitiateTransfer = async () => {
+    if (!selectedTicket || !user || !transferTargetId) {
+      toast.error('Please select a teammate')
+      return
+    }
+    setIsTransferring(true)
+    const { error } = await supabase
+      .from('ticket_transfers')
+      .insert([{
+        ticket_id: selectedTicket.id,
+        from_user_id: user.id,
+        to_user_id: transferTargetId,
+        message: transferMessage || null
+      }])
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('A transfer request is already pending for this ticket')
+      } else {
+        toast.error('Failed to send transfer request')
+      }
+    } else {
+      toast.success('Transfer request sent!')
+      setTransferMessage('')
+      setTransferTargetId('')
+    }
+    setIsTransferring(false)
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,12 +387,14 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
     e.preventDefault()
     const newTicket = { 
       organization_id: orgId,
+      project_id: projectId,
       title, 
       description: description || null, 
       type, 
       priority, 
       status, 
       assignee_id: assigneeId === 'unassigned' ? null : assigneeId,
+      sprint_id: sprintId === 'none' ? null : parseInt(sprintId),
       attachment_urls: attachmentUrls
     }
     const { error } = await supabase.from('tickets').insert([newTicket])
@@ -200,6 +402,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
       setTitle('')
       setDescription('') 
       setAssigneeId('unassigned')
+      setSprintId('none')
       setAttachmentUrls([])
       setIsModalOpen(false)
       fetchData() 
@@ -271,35 +474,52 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Type</span>
-            <select 
-              value={filterType} 
-              onChange={(e) => setFilterType(e.target.value)} 
-              className="bg-accent border-border text-[12px] rounded-md px-2 py-1 focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Sprint</span>
+            <TicketSelect
+              value={filterSprintId}
+              onChange={(e) => setFilterSprintId(e.target.value)}
+              variant="compact"
+              className="min-w-[120px]"
             >
-              <option value="All">All Types</option>
-              <option value="Bug">Bug</option>
-              <option value="Feature">Feature</option>
-              <option value="Task">Task</option>
-            </select>
+                <option value="All">All Sprints</option>
+                <option value="none">Backlog Only</option>
+                {sprints.map(s => (
+                  <option key={s.id} value={s.id.toString()}>{s.name}</option>
+                ))}
+            </TicketSelect>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Type</span>
+            <TicketSelect
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              variant="compact"
+              className="min-w-[100px]"
+            >
+                <option value="All">All Types</option>
+                <option value="Bug">Bug</option>
+                <option value="Feature">Feature</option>
+                <option value="Task">Task</option>
+            </TicketSelect>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[11px] font-medium text-muted uppercase tracking-wider pl-2">Priority</span>
-            <select 
-              value={filterPriority} 
-              onChange={(e) => setFilterPriority(e.target.value)} 
-              className="bg-accent border-border text-[12px] rounded-md px-2 py-1 focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+            <TicketSelect
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              variant="compact"
+              className="min-w-[100px]"
             >
-              <option value="All">All Priorities</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+                <option value="All">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </TicketSelect>
           </div>
-          {(filterType !== 'All' || filterPriority !== 'All') && (
+          {(filterType !== 'All' || filterPriority !== 'All' || filterSprintId !== 'All') && (
             <button 
-              onClick={() => { setFilterType('All'); setFilterPriority('All') }} 
+              onClick={() => { setFilterType('All'); setFilterPriority('All'); setFilterSprintId('All') }} 
               className="text-[11px] text-purple-500 font-bold hover:underline px-2 shrink-0"
             >
               CLEAR
@@ -316,6 +536,9 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
             ticket.status === column && 
             (filterType === 'All' || ticket.type === filterType) && 
             (filterPriority === 'All' || ticket.priority === filterPriority) &&
+            (filterSprintId === 'All' || 
+              (filterSprintId === 'none' ? ticket.sprint_id === null : ticket.sprint_id?.toString() === filterSprintId)
+            ) &&
             (searchQuery.trim() === '' || 
               ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
               ticket.id.toString().includes(searchQuery)
@@ -365,12 +588,23 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                       draggable 
                       onDragStart={() => setDraggedTicketId(ticket.id)} 
                       onClick={() => handleTicketClick(ticket)}
-                      className="bg-card p-3 rounded-lg border border-border shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/40 hover:bg-accent/30 transition-all group/card relative"
+                      className={`bg-card p-3 rounded-lg border shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/40 hover:bg-accent/30 transition-all group/card relative ${selectedTicketIds.includes(ticket.id) ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-border'}`}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPriorityColor(ticket.priority)} uppercase tracking-tighter`}>
-                          {ticket.priority}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <div className={`transition-all duration-300 transform ${selectedTicketIds.includes(ticket.id) ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0 group-hover/card:translate-y-0 group-hover/card:opacity-100'}`}>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedTicketIds.includes(ticket.id)}
+                              onChange={() => toggleTicketSelection(ticket.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 rounded-md border-border border-2 bg-input checked:bg-primary checked:border-primary accent-primary focus:ring-0 focus:ring-offset-0 cursor-pointer transition-all appearance-none"
+                            />
+                          </div>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPriorityColor(ticket.priority)} uppercase tracking-tighter transition-transform duration-300 ${!selectedTicketIds.includes(ticket.id) ? 'group-hover/card:translate-x-0 -translate-x-6' : ''}`}>
+                            {ticket.priority}
+                          </span>
+                        </div>
                         <span className="text-[10px] text-muted font-mono opacity-40 group-hover/card:opacity-100 transition-opacity">#{ticket.id}</span>
                       </div>
                       <h4 className="text-sm font-medium text-foreground line-clamp-2 leading-snug group-hover/card:text-primary transition-colors">{ticket.title}</h4>
@@ -398,6 +632,65 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
         })}
         </div>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedTicketIds.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-card/95 backdrop-blur-md text-foreground px-2 py-2 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.35)] flex flex-col sm:flex-row items-stretch sm:items-center gap-2 z-[90] animate-in fade-in zoom-in-95 slide-in-from-bottom-20 duration-500 [animation-timing-function:cubic-bezier(0.34,1.56,0.64,1)] border border-border hover:shadow-[0_25px_60px_rgba(0,0,0,0.45)] transition-shadow">
+          <div className="flex items-center gap-3 px-3 py-2 bg-accent/50 rounded-md border border-border group/select-count relative overflow-hidden">
+            <div className={`bg-primary text-primary-foreground w-6 h-6 rounded-md flex items-center justify-center text-xs font-black shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-transform duration-300 ${selectedTicketIds.length > 0 ? 'scale-110' : 'scale-100'}`}>
+              {selectedTicketIds.length}
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-wider">Selected</span>
+            <button 
+              onClick={() => setSelectedTicketIds([])}
+              className="ml-auto sm:ml-2 p-1 text-muted hover:text-foreground hover:bg-accent rounded-md transition-colors group"
+              title="Clear Selection"
+            >
+              <X size={14} className="group-hover:rotate-90 transition-transform" />
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <TicketSelect
+              onChange={(e) => handleBulkSprintUpdate(e.target.value)}
+              value=""
+              variant="compact"
+              className="min-w-[136px]"
+            >
+                <option value="" disabled>MOVE TO SPRINT</option>
+                <option value="none">BACKLOG</option>
+                {sprints.map(s => (
+                  <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
+                ))}
+            </TicketSelect>
+
+            <TicketSelect
+              onChange={(e) => handleBulkStatusUpdate(e.target.value)}
+              value=""
+              variant="compact"
+              className="min-w-[128px]"
+            >
+                <option value="" disabled>SET STATUS</option>
+                {columns.map(c => (
+                  <option key={c} value={c}>{c.toUpperCase()}</option>
+                ))}
+            </TicketSelect>
+
+            <TicketSelect
+              onChange={(e) => handleBulkPriorityUpdate(e.target.value)}
+              value=""
+              variant="compact"
+              className="min-w-[128px]"
+            >
+                <option value="" disabled>SET PRIORITY</option>
+                <option value="Critical">CRITICAL</option>
+                <option value="High">HIGH</option>
+                <option value="Medium">MEDIUM</option>
+                <option value="Low">LOW</option>
+            </TicketSelect>
+          </div>
+        </div>
+      )}
 
       {/* Ticket Detail Modal (Full-screen sheet on mobile) */}
       {selectedTicket && (
@@ -444,7 +737,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
                     Description
                   </h3>
-                  <div className="bg-accent/30 p-4 rounded-lg border border-border/40 text-[13px] leading-relaxed text-foreground/80 prose prose-invert prose-sm max-w-none prose-pre:bg-black/40 prose-pre:border prose-pre:border-border/40 prose-code:text-primary">
+                  <div className="bg-accent/30 p-4 rounded-lg border border-border/40 text-[13px] leading-relaxed text-foreground/80 prose dark:prose-invert prose-sm max-w-none prose-pre:bg-black/40 prose-pre:border prose-pre:border-border/40 prose-code:text-primary">
                     {selectedTicket.description ? (
                       <ReactMarkdown>{selectedTicket.description}</ReactMarkdown>
                     ) : (
@@ -503,7 +796,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                                 {new Date(comment.created_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <div className="bg-accent/20 p-3 rounded-lg border border-border/40 text-xs text-foreground/70 prose prose-invert prose-xs max-w-none">
+                            <div className="bg-accent/20 p-3 rounded-lg border border-border/40 text-xs text-foreground/70 prose dark:prose-invert prose-xs max-w-none">
                               <ReactMarkdown>{comment.content}</ReactMarkdown>
                             </div>
                           </div>
@@ -541,13 +834,78 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border ${selectedTicket.assignee_id ? 'bg-primary/10 text-primary border-primary/20 shadow-[0_0_10px_rgba(62,207,142,0.1)]' : 'bg-accent text-muted/40 border-border border-dashed'}`}>
                       {getAssigneeInitials(selectedTicket.assignee_id) || <UserIcon size={12} />}
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1">
                       <span className="text-xs font-bold text-foreground">
                         {team.find(m => m.id === selectedTicket.assignee_id)?.full_name || team.find(m => m.id === selectedTicket.assignee_id)?.email || 'Unassigned'}
                       </span>
                       <span className="text-[10px] text-muted">Core Contributor</span>
                     </div>
                   </div>
+
+                  <h3 className="text-[10px] uppercase font-bold text-muted tracking-widest pt-2">Sprint</h3>
+                  <TicketSelect
+                    value={selectedTicket.sprint_id || 'none'}
+                    onChange={(e) => handleUpdateSprint(e.target.value)}
+                    variant="compact"
+                  >
+                      <option value="none">No Sprint (Backlog)</option>
+                      {sprints.map(sprint => (
+                        <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                      ))}
+                  </TicketSelect>
+
+                  {/* Self-assignment / Unassignment */}
+                  {selectedTicket.assignee_id === null ? (
+                    <button 
+                      onClick={handleClaimTicket}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all border border-primary/20"
+                    >
+                      <UserIcon size={14} /> Claim This Ticket
+                    </button>
+                  ) : selectedTicket.assignee_id === user?.id ? (
+                    <button 
+                      onClick={handleUnassignTicket}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-all border border-red-500/20"
+                    >
+                      <X size={14} /> Unassign Me
+                    </button>
+                  ) : null}
+
+                  {/* Delegation UI */}
+                  {selectedTicket.assignee_id === user?.id && (
+                    <div className="pt-4 space-y-3 border-t border-border/20">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] uppercase font-bold text-muted tracking-widest">Delegate Ticket</h3>
+                        <ArrowRightLeft size={12} className="text-muted/40" />
+                      </div>
+                      <div className="space-y-2">
+                        <TicketSelect
+                          value={transferTargetId}
+                          onChange={(e) => setTransferTargetId(e.target.value)}
+                          variant="compact"
+                        >
+                            <option value="">Select teammate...</option>
+                            {team.filter(m => m.id !== user?.id).map(member => (
+                              <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
+                            ))}
+                        </TicketSelect>
+                        <textarea 
+                          value={transferMessage}
+                          onChange={(e) => setTransferMessage(e.target.value)}
+                          placeholder="Add an optional message..."
+                          className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none min-h-[60px] resize-none placeholder:text-muted/40"
+                        />
+                        <button 
+                          onClick={handleInitiateTransfer}
+                          disabled={isTransferring || !transferTargetId}
+                          className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-emerald-900/20"
+                        >
+                          {isTransferring ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          Send Transfer Request
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -609,43 +967,54 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Type</label>
-                  <select 
-                    value={type} 
-                    onChange={(e) => setType(e.target.value)} 
-                    className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
+                  <TicketSelect
+                    value={type}
+                    onChange={(e) => setType(e.target.value)}
                   >
-                    <option value="Bug">Bug</option>
-                    <option value="Feature">Feature</option>
-                    <option value="Task">Task</option>
-                  </select>
+                      <option value="Bug">Bug</option>
+                      <option value="Feature">Feature</option>
+                      <option value="Task">Task</option>
+                  </TicketSelect>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Priority</label>
-                  <select 
-                    value={priority} 
-                    onChange={(e) => setPriority(e.target.value)} 
-                    className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
+                  <TicketSelect
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
                   >
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                  </TicketSelect>
                 </div>
               </div>
               
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Assignee</label>
-                <select 
-                  value={assigneeId} 
-                  onChange={(e) => setAssigneeId(e.target.value)} 
-                  className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
-                >
-                  <option value="unassigned">Unassigned</option>
-                  {team.map(member => (
-                    <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Assignee</label>
+                  <TicketSelect
+                    value={assigneeId}
+                    onChange={(e) => setAssigneeId(e.target.value)}
+                  >
+                      <option value="unassigned">Unassigned</option>
+                      {team.map(member => (
+                        <option key={member.id} value={member.id}>{member.full_name || member.email}</option>
+                      ))}
+                  </TicketSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-muted uppercase tracking-wider pl-1">Sprint</label>
+                  <TicketSelect
+                    value={sprintId}
+                    onChange={(e) => setSprintId(e.target.value)}
+                  >
+                      <option value="none">No Sprint (Backlog)</option>
+                      {sprints.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                  </TicketSelect>
+                </div>
               </div>
 
               <div className="space-y-2.5">

@@ -18,21 +18,19 @@ import {
   Check,
   Loader2,
   ChevronLeft,
-  ChevronRight,
-  Bold,
-  Italic,
-  List,
-  Code,
-  Eye,
-  Edit2
+  ChevronRight
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import StandupModule from '@/components/StandupModule'
 import { toast } from 'react-hot-toast'
-import ReactMarkdown from 'react-markdown'
 
-export default function DashboardPage({ params }: { params: Promise<{ orgId: string }> }) {
-  const { orgId } = useReact(params)
+export default function DashboardPage({ params }: { params: Promise<{ orgId: string, projectId: string }> }) {
+  const { orgId, projectId } = useReact(params)
+  
+  if (!orgId || !projectId) {
+    return <div className="p-8 text-center text-red-500">Error: Missing Organization or Project ID</div>
+  }
+
   const [metrics, setMetrics] = useState({
     total: 0,
     open: 0,
@@ -47,11 +45,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
   const [personalNote, setPersonalNote] = useState('')
   const [isSavingNote, setIsSavingNote] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved')
-  const [isPreviewMode, setIsPreviewMode] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [sprints, setSprints] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [currentSprintIndex, setCurrentSprintIndex] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isStandupPanelOpen, setIsStandupPanelOpen] = useState(false)
@@ -63,15 +57,6 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
       
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Fetch Projects
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('id, name')
-        .eq('organization_id', orgId)
-        .order('name')
-      
-      if (projectsData) setProjects(projectsData)
-
       // Fetch organization config for GitHub
       const { data: orgConfig } = await supabase
         .from('organizations')
@@ -79,33 +64,38 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
         .eq('id', orgId)
         .single()
 
-      // Fetch all tickets for metrics, filtered by orgId
+      // Fetch all tickets for metrics, filtered by projectId
       const { data: allTickets, error: ticketsError } = await supabase
         .from('tickets')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('project_id', projectId)
 
-      // Fetch 5 most recent tickets, filtered by orgId
+      // Fetch 5 most recent tickets, filtered by projectId
       const { data: recent, error: recentError } = await supabase
         .from('tickets')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('project_id', projectId)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(5)
 
       if (!recentError && recent) {
         setRecentTickets(recent)
       }
 
       // Fetch all sprints
+      const today = new Date().toISOString().split('T')[0]
       const { data: sprintsData } = await supabase
         .from('sprints')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('project_id', projectId)
         .order('start_date', { ascending: false })
       
-      if (sprintsData) {
+      if (sprintsData && sprintsData.length > 0) {
         setSprints(sprintsData)
+        const activeIdx = sprintsData.findIndex(s => s.start_date <= today && s.end_date >= today)
+        setCurrentSprintIndex(activeIdx !== -1 ? activeIdx : 0)
+      } else {
+        setSprints([])
       }
 
       // Fetch personal note
@@ -168,25 +158,13 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
     }
 
     fetchDashboardData()
-  }, [orgId, supabase])
-
-  // Filtered Data
-  const filteredSprints = selectedProjectId === 'all' 
-    ? sprints 
-    : sprints.filter(s => s.project_id === selectedProjectId)
-
-  const displayRecentTickets = recentTickets.slice(0, 5)
-
-  // Reset index when filter changes or data loads
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    const activeIdx = filteredSprints.findIndex(s => s.start_date <= today && s.end_date >= today)
-    setCurrentSprintIndex(activeIdx !== -1 ? activeIdx : 0)
-  }, [selectedProjectId, filteredSprints.length])
+  }, [orgId, projectId, supabase])
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const autoSaveNote = (val: string) => {
+  
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setPersonalNote(val)
     setSaveStatus('saving')
     
     if (timeoutRef.current) {
@@ -204,7 +182,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
           
         if (error || !data || data.length === 0) {
           console.error("Error saving note:", error || "RLS policy blocked update")
-          toast.error("Failed to save note.")
+          toast.error("Failed to save note. Make sure the database schema is updated.")
           setSaveStatus('idle')
         } else {
           setSaveStatus('saved')
@@ -212,41 +190,9 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
       }
     }, 1000)
   }
-  
-  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value
-    setPersonalNote(val)
-    autoSaveNote(val)
-  }
-
-  const handleFormat = (prefix: string, suffix: string = '') => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const text = textarea.value
-    const selectedText = text.substring(start, end)
-    
-    const beforeText = text.substring(0, start)
-    const afterText = text.substring(end)
-    
-    const newText = beforeText + prefix + selectedText + suffix + afterText
-    setPersonalNote(newText)
-    autoSaveNote(newText)
-
-    // Set focus back and select the formatted text
-    setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(
-        start + prefix.length,
-        start + prefix.length + selectedText.length
-      )
-    }, 0)
-  }
 
   // Helpers for Sprint & Calendar
-  const activeSprint = filteredSprints[currentSprintIndex] || null
+  const activeSprint = sprints[currentSprintIndex] || null
 
   const getSprintProgress = () => {
     if (!activeSprint) return { percent: 0, daysLeft: 0 }
@@ -324,40 +270,22 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Active Sprint Widget */}
         <div className="lg:col-span-2 bg-card rounded-lg border border-border shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-6 py-3 border-b border-border flex items-center justify-between bg-accent/10">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-purple-500" />
-                <h2 className="text-sm font-semibold text-foreground">
-                  Sprint Overview
-                </h2>
-              </div>
-              
-              <div className="h-4 w-px bg-border/50 mx-1" />
-
-              <select 
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-transparent text-[11px] font-bold text-muted-foreground uppercase tracking-widest outline-none focus:text-foreground transition-colors cursor-pointer hover:bg-accent/50 px-2 py-1 rounded"
-              >
-                <option value="all">All Projects</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-accent/10">
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => setCurrentSprintIndex(prev => Math.min(filteredSprints.length - 1, prev + 1))}
-                disabled={currentSprintIndex === filteredSprints.length - 1 || filteredSprints.length === 0}
+                onClick={() => setCurrentSprintIndex(prev => Math.min(sprints.length - 1, prev + 1))}
+                disabled={currentSprintIndex === sprints.length - 1 || sprints.length === 0}
                 className="p-1 hover:bg-accent rounded disabled:opacity-50 transition-colors"
               >
                 <ChevronLeft size={16} className="text-muted" />
               </button>
+              <Zap size={16} className="text-purple-500" />
+              <h2 className="text-sm font-semibold text-foreground">
+                {activeSprint ? activeSprint.name : "Sprint Overview"}
+              </h2>
               <button 
                 onClick={() => setCurrentSprintIndex(prev => Math.max(0, prev - 1))}
-                disabled={currentSprintIndex === 0 || filteredSprints.length === 0}
+                disabled={currentSprintIndex === 0 || sprints.length === 0}
                 className="p-1 hover:bg-accent rounded disabled:opacity-50 transition-colors"
               >
                 <ChevronRight size={16} className="text-muted" />
@@ -409,7 +337,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                 <p className="text-sm font-medium text-foreground">No active sprint</p>
                 <p className="text-xs text-muted mt-1">Start a new sprint to track team progress.</p>
                 <button 
-                  onClick={() => window.location.href = `/${orgId}/sprints`}
+                  onClick={() => window.location.href = `/${orgId}/projects/${projectId}/sprints`}
                   className="mt-4 text-xs font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-widest"
                 >
                   Plan Sprint
@@ -470,85 +398,20 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6 flex flex-col h-full">
           {/* Personal Scratchpad */}
-          <div className="bg-card rounded-lg border border-border shadow-sm flex-1 flex flex-col min-h-[400px] relative overflow-hidden">
-            <div className="px-6 py-4 border-b border-border bg-accent/10 shrink-0">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Personal Scratchpad</h2>
-                <div className="text-[10px] text-muted font-medium flex items-center gap-1">
-                  {saveStatus === 'saving' && <><Loader2 size={10} className="animate-spin" /> Saving</>}
-                  {saveStatus === 'saved' && <><Check size={10} className="text-purple-500" /> Saved</>}
-                </div>
-              </div>
-
-              {/* Markdown Toolbar */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => handleFormat('**', '**')}
-                    disabled={isPreviewMode}
-                    className="p-1.5 text-muted hover:text-foreground hover:bg-accent rounded transition-all disabled:opacity-30"
-                    title="Bold"
-                  >
-                    <Bold size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleFormat('_', '_')}
-                    disabled={isPreviewMode}
-                    className="p-1.5 text-muted hover:text-foreground hover:bg-accent rounded transition-all disabled:opacity-30"
-                    title="Italic"
-                  >
-                    <Italic size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleFormat('\n- ')}
-                    disabled={isPreviewMode}
-                    className="p-1.5 text-muted hover:text-foreground hover:bg-accent rounded transition-all disabled:opacity-30"
-                    title="List"
-                  >
-                    <List size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleFormat('`', '`')}
-                    disabled={isPreviewMode}
-                    className="p-1.5 text-muted hover:text-foreground hover:bg-accent rounded transition-all disabled:opacity-30"
-                    title="Inline Code"
-                  >
-                    <Code size={14} />
-                  </button>
-                </div>
-
-                <button 
-                  onClick={() => setIsPreviewMode(!isPreviewMode)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    isPreviewMode 
-                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
-                      : 'bg-accent text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {isPreviewMode ? (
-                    <><Edit2 size={10} /> Write</>
-                  ) : (
-                    <><Eye size={10} /> Preview</>
-                  )}
-                </button>
+          <div className="bg-card rounded-lg border border-border shadow-sm flex-1 flex flex-col min-h-[400px] relative">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-accent/10 shrink-0">
+              <h2 className="text-sm font-semibold text-foreground">Personal Scratchpad</h2>
+              <div className="text-[10px] text-muted font-medium flex items-center gap-1">
+                {saveStatus === 'saving' && <><Loader2 size={10} className="animate-spin" /> Saving</>}
+                {saveStatus === 'saved' && <><Check size={10} className="text-purple-500" /> Saved</>}
               </div>
             </div>
-            
-            <div className="flex-1 relative overflow-hidden flex flex-col">
-              {isPreviewMode ? (
-                <div className="flex-1 p-5 overflow-auto prose dark:prose-invert prose-sm max-w-none custom-scrollbar">
-                  <ReactMarkdown>{personalNote || '_No content to preview_'}</ReactMarkdown>
-                </div>
-              ) : (
-                <textarea
-                  ref={textareaRef}
-                  value={personalNote}
-                  onChange={handleNoteChange}
-                  placeholder="Scratchpad for your daily to-dos, quick thoughts, or active focus... (Supports Markdown)"
-                  className="w-full flex-1 bg-transparent p-5 text-sm text-foreground/90 placeholder:text-muted/40 outline-none resize-none custom-scrollbar leading-relaxed"
-                />
-              )}
-            </div>
+            <textarea
+              value={personalNote}
+              onChange={handleNoteChange}
+              placeholder="Scratchpad for your daily to-dos, quick thoughts, or active focus..."
+              className="w-full flex-1 bg-transparent p-5 text-sm text-foreground/90 placeholder:text-muted/40 outline-none resize-none custom-scrollbar leading-relaxed"
+            />
           </div>
         </div>
 
@@ -557,7 +420,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Recent Tickets</h2>
               <button 
-                onClick={() => window.location.href = `/${orgId}/tickets`}
+                onClick={() => window.location.href = `/${orgId}/projects/${projectId}/tickets`}
                 className="text-xs text-muted hover:text-primary transition-colors flex items-center gap-1"
               >
                 View all <ArrowRight size={12} />
@@ -575,11 +438,11 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                     <Skeleton className="h-6 w-16 rounded-full" />
                   </div>
                 ))
-              ) : displayRecentTickets.length > 0 ? (
-                displayRecentTickets.map((ticket) => (
+              ) : recentTickets.length > 0 ? (
+                recentTickets.map((ticket) => (
                   <div 
                     key={ticket.id} 
-                    onClick={() => window.location.href = `/${orgId}/projects/${ticket.project_id}/tickets?id=${ticket.id}`}
+                    onClick={() => window.location.href = `/${orgId}/projects/${projectId}/tickets?id=${ticket.id}`}
                     className="p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors cursor-pointer group"
                   >
                     <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
