@@ -598,7 +598,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                               checked={selectedTicketIds.includes(ticket.id)}
                               onChange={() => toggleTicketSelection(ticket.id)}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 rounded-md border-white/30 border-2 bg-black checked:bg-white checked:border-white accent-white focus:ring-0 focus:ring-offset-0 cursor-pointer transition-all appearance-none"
+                              className="w-4 h-4 rounded-md border-border border-2 bg-input checked:bg-primary checked:border-primary accent-primary focus:ring-0 focus:ring-offset-0 cursor-pointer transition-all appearance-none"
                             />
                           </div>
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPriorityColor(ticket.priority)} uppercase tracking-tighter transition-transform duration-300 ${!selectedTicketIds.includes(ticket.id) ? 'group-hover/card:translate-x-0 -translate-x-6' : ''}`}>
@@ -737,7 +737,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
                     Description
                   </h3>
-                  <div className="bg-accent/30 p-4 rounded-lg border border-border/40 text-[13px] leading-relaxed text-foreground/80 prose prose-invert prose-sm max-w-none prose-pre:bg-black/40 prose-pre:border prose-pre:border-border/40 prose-code:text-primary">
+                  <div className="bg-accent/30 p-4 rounded-lg border border-border/40 text-[13px] leading-relaxed text-foreground/80 prose dark:prose-invert prose-sm max-w-none prose-pre:bg-black/40 prose-pre:border prose-pre:border-border/40 prose-code:text-primary">
                     {selectedTicket.description ? (
                       <ReactMarkdown>{selectedTicket.description}</ReactMarkdown>
                     ) : (
@@ -796,7 +796,7 @@ export default function TicketsPage({ params }: { params: Promise<{ orgId: strin
                                 {new Date(comment.created_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <div className="bg-accent/20 p-3 rounded-lg border border-border/40 text-xs text-foreground/70 prose prose-invert prose-xs max-w-none">
+                            <div className="bg-accent/20 p-3 rounded-lg border border-border/40 text-xs text-foreground/70 prose dark:prose-invert prose-xs max-w-none">
                               <ReactMarkdown>{comment.content}</ReactMarkdown>
                             </div>
                           </div>

@@ -4,7 +4,14 @@ import { useState, Suspense } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Mail, Lock, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { 
+  Zap, 
+  Mail, 
+  Lock, 
+  AlertCircle, 
+  ArrowRight, 
+  Loader2 
+} from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -52,7 +59,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="max-w-[400px] w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
+    <div className="max-w-[400px] w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10 mx-auto">
       <div className="text-center">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 shadow-[0_0_20px_rgba(62,207,142,0.1)] mb-6 animate-in zoom-in-50 duration-500">
           <Zap size={24} className="text-primary fill-current" />

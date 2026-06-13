@@ -2,34 +2,25 @@
 @import "tailwindcss";
 
 :root {
-  /* Supabase Dashboard Color Palette */
+  /* Default: Dark Mode (Supabase Palette) */
   --background: #0f0f0f;
   --foreground: #ededed;
-  
   --muted: #a3a3a3;
   --muted-foreground: #707070;
-  
   --card: #1c1c1c;
   --card-foreground: #ededed;
-  
   --popover: #1c1c1c;
   --popover-foreground: #ededed;
-  
   --border: rgba(255, 255, 255, 0.08);
   --input: #222222;
-  
   --primary: #a855f7;
-  --primary-foreground: #000000;
-  
+  --primary-foreground: #ffffff;
   --secondary: #2e2e2e;
   --secondary-foreground: #ededed;
-  
   --accent: #2e2e2e;
   --accent-foreground: #ededed;
-  
   --destructive: #ea4335;
   --destructive-foreground: #ffffff;
-  
   --ring: #a855f7;
   
   --radius: 8px;
@@ -61,6 +52,29 @@
   --tracking-normal: 0;
   --tracking-label: 0.02em;
   --tracking-uppercase: 0.06em;
+}
+
+.light {
+  /* Light Mode Palette */
+  --background: #ffffff;
+  --foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --border: #e4e4e7;
+  --input: #f4f4f5;
+  --primary: #a855f7;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --ring: #a855f7;
 }
 
 @theme inline {
@@ -140,7 +154,7 @@
   }
 }
 
-/* Scrollbar styling for a dark, compact look */
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -149,9 +163,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: color-mix(in srgb, var(--foreground) 20%, transparent);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: color-mix(in srgb, var(--foreground) 30%, transparent);
 }

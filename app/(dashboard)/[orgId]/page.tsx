@@ -521,7 +521,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
                   onClick={() => setIsPreviewMode(!isPreviewMode)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-all ${
                     isPreviewMode 
-                      ? 'bg-purple-500 text-black shadow-lg shadow-purple-500/20' 
+                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
                       : 'bg-accent text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -536,7 +536,7 @@ export default function DashboardPage({ params }: { params: Promise<{ orgId: str
             
             <div className="flex-1 relative overflow-hidden flex flex-col">
               {isPreviewMode ? (
-                <div className="flex-1 p-5 overflow-auto prose prose-invert prose-sm max-w-none custom-scrollbar">
+                <div className="flex-1 p-5 overflow-auto prose dark:prose-invert prose-sm max-w-none custom-scrollbar">
                   <ReactMarkdown>{personalNote || '_No content to preview_'}</ReactMarkdown>
                 </div>
               ) : (

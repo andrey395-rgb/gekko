@@ -56,8 +56,8 @@ export default function NewWorkspacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-[400px] space-y-10">
+    <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-center relative">
+      <div className="w-full max-w-[400px] space-y-10 relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="w-12 h-12 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center text-primary shadow-lg shadow-primary/5">
             <GeckoLogo size={24} />
@@ -104,17 +104,8 @@ export default function NewWorkspacePage() {
             </button>
           </div>
         </form>
-
-        <div className="pt-10 border-t border-border/50 text-center">
-          <button 
-            onClick={() => router.back()}
-            className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
       </div>
-      
+
       {/* Background Decor */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
     </div>

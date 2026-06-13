@@ -231,7 +231,7 @@ export default function StandupModule({
                             <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
                               <CheckCircle2 className="w-3 h-3 text-primary/60" /> Yesterday
                             </div>
-                            <div className="text-foreground/90 pl-4.5 prose prose-invert prose-sm max-w-none">
+                            <div className="text-foreground/90 pl-4.5 prose dark:prose-invert prose-sm max-w-none">
                               <ReactMarkdown>{standup.yesterday}</ReactMarkdown>
                             </div>
                           </div>
@@ -239,7 +239,7 @@ export default function StandupModule({
                             <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
                               <MessageSquare className="w-3 h-3 text-primary/60" /> Today
                             </div>
-                            <div className="text-foreground/90 pl-4.5 prose prose-invert prose-sm max-w-none">
+                            <div className="text-foreground/90 pl-4.5 prose dark:prose-invert prose-sm max-w-none">
                               <ReactMarkdown>{standup.today}</ReactMarkdown>
                             </div>
                           </div>
@@ -248,7 +248,7 @@ export default function StandupModule({
                               <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
                                 <AlertCircle className="w-3 h-3 text-primary/60" /> Blockers
                               </div>
-                              <div className="text-foreground/90 pl-4.5 prose prose-invert prose-sm max-w-none">
+                              <div className="text-foreground/90 pl-4.5 prose dark:prose-invert prose-sm max-w-none">
                                 <ReactMarkdown>{standup.blockers}</ReactMarkdown>
                               </div>
                             </div>
