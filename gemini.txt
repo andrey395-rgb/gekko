@@ -1,0 +1,9 @@
+I have a sidebar navigation with collapsible project folders (e.g. "Project Test 1") that contain a list of nav items (Tickets, Sprints, Calendar, Team). Right now the sub-navigation only shows when the folder is expanded/clicked. I want to add hover-triggered behavior with a smooth animation. Specifically:
+Trigger: When the user hovers over a project folder row, the nested navigation list should automatically expand/open — no click required.
+Animation: Use a smooth height + opacity transition (not an abrupt show/hide). Animate max-height (or use a CSS Grid grid-template-rows trick) combined with opacity, with an ease-out timing function, ~200–300ms duration.
+Closing behavior: When the mouse leaves the folder and the dropdown area, collapse it back with the same animation, reversed. Add a short delay (~150ms) before closing so it doesn't flicker if the user is just moving the mouse between the folder row and the items below it.
+Don't break click-to-expand: If the folder can also be toggled by clicking (e.g. pinned open), keep that working — hover should be an additional convenience, not a replacement, and clicking should keep it open even after the mouse leaves.
+Icon rotation (if applicable): If there's a chevron/arrow icon next to the folder, rotate it (e.g. 0° to 90°/180°) in sync with the expand animation.
+Accessibility/touch: Make sure this still works via keyboard focus (:focus-within) and doesn't break tap behavior on touch devices, since hover doesn't exist there — fall back to click/tap only on touch.
+No layout jump: Make sure expanding the dropdown doesn't cause other sidebar items to jarringly snap — push them down smoothly as part of the same transition.
+Implement this in React component, matching the existing dark theme and purple accent styling already used for the active "Tickets" state.
