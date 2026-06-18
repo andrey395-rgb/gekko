@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -16,7 +16,8 @@ import {
   Calendar,
   Layers,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  ChevronDown
 } from 'lucide-react'
 import { GeckoLogo } from './GeckoLogo'
 
@@ -31,6 +32,8 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
   const [projects, setProjects] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -61,7 +64,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
     router.refresh()
   }
 
-  const NavItem = ({ label, href, icon: Icon, active }: any) => (
+  const NavItem = ({ label, href, icon: Icon, active, trailingIcon: TrailingIcon, trailingClassName }: any) => (
     <div className="relative group/item">
       <Link 
         href={href}
@@ -75,9 +78,14 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
         <div className="flex-shrink-0 w-5 flex justify-center">
           <Icon size={18} strokeWidth={active ? 2.5 : 2} className={active ? 'text-purple-500' : 'text-muted-foreground/70 group-hover/item:text-foreground'} />
         </div>
-        <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 lg:opacity-0 lg:max-w-0 lg:group-hover:opacity-100 lg:group-hover:max-w-[160px]`}>
+        <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 lg:opacity-0 lg:max-w-0 lg:group-hover:opacity-100 lg:group-hover:max-w-[160px] flex-1`}>
           {label}
         </span>
+        {TrailingIcon && (
+          <div className={`transition-all duration-300 lg:opacity-0 lg:group-hover:opacity-100 ${trailingClassName}`}>
+            <TrailingIcon size={14} />
+          </div>
+        )}
       </Link>
       
       {/* Tooltip (only on desktop and when not expanded) */}
@@ -169,44 +177,66 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
               <div className="flex flex-col gap-1">
                 {projects.map(project => {
                   const isActive = projectId === project.id
+                  const isHovered = hoveredProjectId === project.id
+                  const isExpanded = isActive || isHovered
+
                   return (
-                    <div key={project.id} className="flex flex-col gap-1">
+                    <div 
+                      key={project.id} 
+                      className="flex flex-col gap-1 group/folder"
+                      onMouseEnter={() => {
+                        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+                        setHoveredProjectId(project.id)
+                      }}
+                      onMouseLeave={() => {
+                        timeoutRef.current = setTimeout(() => {
+                          setHoveredProjectId(null)
+                        }, 150)
+                      }}
+                    >
                       <NavItem 
                         label={project.name} 
                         href={`/${orgId}/projects/${project.id}`} 
                         icon={FolderOpen} 
-                        active={isActive && pathname === `/${orgId}/projects/${project.id}`} 
+                        active={isActive && pathname === `/${orgId}/projects/${project.id}`}
+                        trailingIcon={ChevronDown}
+                        trailingClassName={isExpanded ? 'rotate-180' : 'rotate-0'}
                       />
 
-                      {/* Nested Views for Active Project */}
-                      {isActive && (
-                        <div className="flex flex-col gap-1 overflow-hidden transition-all duration-300 lg:max-h-0 lg:opacity-0 lg:group-hover:max-h-[500px] lg:group-hover:opacity-100 lg:ml-4 lg:pl-4 lg:border-l lg:border-border/50">
-                          <NavItem 
-                            label="Tickets" 
-                            href={`/${orgId}/projects/${project.id}/tickets`} 
-                            icon={Ticket} 
-                            active={pathname.includes('/tickets')} 
-                          />
-                          <NavItem 
-                            label="Sprints" 
-                            href={`/${orgId}/projects/${project.id}/sprints`} 
-                            icon={Zap} 
-                            active={pathname.includes('/sprints')} 
-                          />
-                          <NavItem 
-                            label="Calendar" 
-                            href={`/${orgId}/projects/${project.id}/calendar`} 
-                            icon={Calendar} 
-                            active={pathname.includes('/calendar')} 
-                          />
-                          <NavItem 
-                            label="Team" 
-                            href={`/${orgId}/projects/${project.id}/team`} 
-                            icon={Users} 
-                            active={pathname.includes('/team')} 
-                          />
-                        </div>
-                      )}
+                      {/* Nested Views for Project */}
+                      <div className={`
+                        flex flex-col gap-1 overflow-hidden transition-all duration-300 ease-out ml-4 pl-4 border-l border-border/50
+                        ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}
+                        group-focus-within/folder:max-h-[500px] group-focus-within/folder:opacity-100
+                        lg:max-h-0 lg:opacity-0 
+                        ${isExpanded ? 'lg:group-hover:max-h-[500px] lg:group-hover:opacity-100' : 'lg:group-hover:max-h-0 lg:group-hover:opacity-0'}
+                        lg:group-focus-within/folder:max-h-[500px] lg:group-focus-within/folder:opacity-100
+                      `}>
+                        <NavItem 
+                          label="Tickets" 
+                          href={`/${orgId}/projects/${project.id}/tickets`} 
+                          icon={Ticket} 
+                          active={pathname.includes('/tickets')} 
+                        />
+                        <NavItem 
+                          label="Sprints" 
+                          href={`/${orgId}/projects/${project.id}/sprints`} 
+                          icon={Zap} 
+                          active={pathname.includes('/sprints')} 
+                        />
+                        <NavItem 
+                          label="Calendar" 
+                          href={`/${orgId}/projects/${project.id}/calendar`} 
+                          icon={Calendar} 
+                          active={pathname.includes('/calendar')} 
+                        />
+                        <NavItem 
+                          label="Team" 
+                          href={`/${orgId}/projects/${project.id}/team`} 
+                          icon={Users} 
+                          active={pathname.includes('/team')} 
+                        />
+                      </div>
                     </div>
                   )
                 })}
