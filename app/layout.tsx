@@ -12,6 +12,7 @@ import OrganizationSelector from '@/components/OrganizationSelector'
 import NotificationCenter from '@/components/NotificationCenter'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
+import ProjectModalManager from '@/components/ProjectModalManager'
 import { 
   Menu, 
   ChevronRight,
@@ -237,6 +238,7 @@ export default function RootLayout({
           </main>
           )}
           <CommandPalette />
+          <ProjectModalManager />
           </Providers>
           </body>
           </html>
