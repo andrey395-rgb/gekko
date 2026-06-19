@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import type { User } from '@supabase/supabase-js'
 import { 
   LayoutDashboard, 
   Ticket, 
@@ -14,61 +15,46 @@ import {
   FolderOpen,
   Plus,
   Calendar,
-  Layers,
   LogOut,
-  User as UserIcon,
-  ChevronDown
+  ChevronDown,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  Copy,
+  type LucideIcon
 } from 'lucide-react'
 import { GeckoLogo } from './GeckoLogo'
 
-export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string, setIsDrawerOpen: (open: boolean) => void }) {
-  const pathname = usePathname()
-  const params = useParams()
-  const router = useRouter()
-  const orgId = params?.orgId as string | undefined
-  const projectId = params?.projectId as string | undefined
-  const supabase = createClient()
+type Project = {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  created_at?: string
+}
 
-  const [projects, setProjects] = useState<any[]>([])
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+type ProjectContextMenu = {
+  project: Project
+  x: number
+  y: number
+}
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
+type NavItemProps = {
+  label: string
+  href: string
+  icon: LucideIcon
+  active: boolean
+  trailingIcon?: LucideIcon
+  trailingClassName?: string
+  onNavigate: () => void
+}
 
-    if (orgId) {
-      const fetchProjects = async () => {
-        setLoading(true)
-        const { data } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: true })
-        
-        if (data) setProjects(data)
-        setLoading(false)
-      }
-      fetchProjects()
-    }
-  }, [orgId, supabase])
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
-  const NavItem = ({ label, href, icon: Icon, active, trailingIcon: TrailingIcon, trailingClassName }: any) => (
+function NavItem({ label, href, icon: Icon, active, trailingIcon: TrailingIcon, trailingClassName, onNavigate }: NavItemProps) {
+  return (
     <div className="relative group/item">
       <Link 
         href={href}
-        onClick={() => setIsDrawerOpen(false)}
+        onClick={onNavigate}
         className={`flex items-center h-10 gap-3 px-3 rounded-md transition-all ${
           active 
             ? 'bg-purple-500/10 text-purple-500 font-semibold' 
@@ -78,7 +64,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
         <div className="flex-shrink-0 w-5 flex justify-center">
           <Icon size={18} strokeWidth={active ? 2.5 : 2} className={active ? 'text-purple-500' : 'text-muted-foreground/70 group-hover/item:text-foreground'} />
         </div>
-        <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 lg:opacity-0 lg:max-w-0 lg:group-hover:opacity-100 lg:group-hover:max-w-[160px] flex-1`}>
+        <span className="text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 lg:opacity-0 lg:max-w-0 lg:group-hover:opacity-100 lg:group-hover:max-w-[160px] flex-1">
           {label}
         </span>
         {TrailingIcon && (
@@ -94,22 +80,131 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
       </div>
     </div>
   )
+}
 
-  const handleCreateProject = async () => {
-    if (!orgId) return
-    const name = prompt('Project Name:')
-    if (!name) return
+export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string, setIsDrawerOpen: (open: boolean) => void }) {
+  const pathname = usePathname()
+  const params = useParams()
+  const router = useRouter()
+  const orgId = params?.orgId as string | undefined
+  const projectId = params?.projectId as string | undefined
+  const supabase = createClient()
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert([{ organization_id: orgId, name }])
-      .select()
-      .single()
-    
-    if (data) {
-      setProjects([...projects, data])
-      router.push(`/${orgId}/projects/${data.id}`)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [user, setUser] = useState<User | null>(null)
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<ProjectContextMenu | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
     }
+    getUser()
+  }, [supabase])
+
+  useEffect(() => {
+    if (!orgId) return
+
+    const fetchProjects = async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: true })
+      
+      if (data) setProjects(data)
+    }
+
+    fetchProjects()
+
+    const handleRefresh = () => {
+      fetchProjects()
+    }
+
+    window.addEventListener('refresh-projects', handleRefresh)
+    return () => {
+      window.removeEventListener('refresh-projects', handleRefresh)
+    }
+  }, [orgId, supabase])
+
+  useEffect(() => {
+    if (!contextMenu) return
+
+    const closeContextMenu = () => setContextMenu(null)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeContextMenu()
+    }
+
+    window.addEventListener('click', closeContextMenu)
+    window.addEventListener('contextmenu', closeContextMenu)
+    window.addEventListener('resize', closeContextMenu)
+    window.addEventListener('scroll', closeContextMenu, true)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('click', closeContextMenu)
+      window.removeEventListener('contextmenu', closeContextMenu)
+      window.removeEventListener('resize', closeContextMenu)
+      window.removeEventListener('scroll', closeContextMenu, true)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [contextMenu])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  const handleCreateProject = () => {
+    if (!orgId) return
+    window.dispatchEvent(new CustomEvent('open-create-project-modal', { detail: { orgId } }))
+  }
+
+  const handleProjectContextMenu = (event: ReactMouseEvent, project: Project) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    setHoveredProjectId(project.id)
+    setContextMenu({
+      project,
+      x: Math.min(event.clientX, window.innerWidth - 180),
+      y: Math.min(event.clientY, window.innerHeight - 170)
+    })
+  }
+
+  const openProject = (project: Project) => {
+    if (!orgId) return
+    setContextMenu(null)
+    router.push(`/${orgId}/projects/${project.id}`)
+    setIsDrawerOpen(false)
+  }
+
+  const copyProjectLink = async (project: Project) => {
+    if (!orgId) return
+    const url = `${window.location.origin}/${orgId}/projects/${project.id}`
+
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      prompt('Copy project link:', url)
+    }
+
+    setContextMenu(null)
+  }
+
+  const renameProject = (project: Project) => {
+    if (!orgId) return
+    setContextMenu(null)
+    window.dispatchEvent(new CustomEvent('open-rename-project-modal', { detail: { project, orgId } }))
+  }
+
+  const deleteProject = (project: Project) => {
+    if (!orgId) return
+    setContextMenu(null)
+    window.dispatchEvent(new CustomEvent('open-delete-project-modal', { detail: { project, orgId } }))
   }
 
   return (
@@ -140,6 +235,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
                 href={`/${orgId}`} 
                 icon={LayoutDashboard} 
                 active={pathname === `/${orgId}`} 
+                onNavigate={() => setIsDrawerOpen(false)}
               />
               <div className="relative group/item">
                 <button 
@@ -184,6 +280,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
                     <div 
                       key={project.id} 
                       className="flex flex-col gap-1 group/folder"
+                      onContextMenu={(event) => handleProjectContextMenu(event, project)}
                       onMouseEnter={() => {
                         if (timeoutRef.current) clearTimeout(timeoutRef.current)
                         setHoveredProjectId(project.id)
@@ -201,6 +298,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
                         active={isActive && pathname === `/${orgId}/projects/${project.id}`}
                         trailingIcon={ChevronDown}
                         trailingClassName={isExpanded ? 'rotate-180' : 'rotate-0'}
+                        onNavigate={() => setIsDrawerOpen(false)}
                       />
 
                       {/* Nested Views for Project */}
@@ -217,24 +315,28 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
                           href={`/${orgId}/projects/${project.id}/tickets`} 
                           icon={Ticket} 
                           active={pathname.includes('/tickets')} 
+                          onNavigate={() => setIsDrawerOpen(false)}
                         />
                         <NavItem 
                           label="Sprints" 
                           href={`/${orgId}/projects/${project.id}/sprints`} 
                           icon={Zap} 
                           active={pathname.includes('/sprints')} 
+                          onNavigate={() => setIsDrawerOpen(false)}
                         />
                         <NavItem 
                           label="Calendar" 
                           href={`/${orgId}/projects/${project.id}/calendar`} 
                           icon={Calendar} 
                           active={pathname.includes('/calendar')} 
+                          onNavigate={() => setIsDrawerOpen(false)}
                         />
                         <NavItem 
                           label="Team" 
                           href={`/${orgId}/projects/${project.id}/team`} 
                           icon={Users} 
                           active={pathname.includes('/team')} 
+                          onNavigate={() => setIsDrawerOpen(false)}
                         />
                       </div>
                     </div>
@@ -260,6 +362,7 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
             href={`/${orgId}/settings`} 
             icon={Settings} 
             active={pathname.includes('/settings')} 
+            onNavigate={() => setIsDrawerOpen(false)}
           />
         )}
         
@@ -291,6 +394,55 @@ export default function Sidebar({ orgName, setIsDrawerOpen }: { orgName: string,
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-[100] w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+          role="menu"
+          aria-label={`${contextMenu.project.name} project actions`}
+        >
+          <button
+            type="button"
+            onClick={() => openProject(contextMenu.project)}
+            className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-xs font-medium hover:bg-accent"
+            role="menuitem"
+          >
+            <ExternalLink size={14} />
+            Open
+          </button>
+          <button
+            type="button"
+            onClick={() => renameProject(contextMenu.project)}
+            className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-xs font-medium hover:bg-accent"
+            role="menuitem"
+          >
+            <Pencil size={14} />
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={() => copyProjectLink(contextMenu.project)}
+            className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-xs font-medium hover:bg-accent"
+            role="menuitem"
+          >
+            <Copy size={14} />
+            Copy link
+          </button>
+          <div className="my-1 h-px bg-border" />
+          <button
+            type="button"
+            onClick={() => deleteProject(contextMenu.project)}
+            className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-xs font-medium text-destructive hover:bg-destructive/10"
+            role="menuitem"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }
