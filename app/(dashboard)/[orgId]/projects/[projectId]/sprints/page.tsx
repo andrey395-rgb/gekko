@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use as useReact } from 'react'
+import { useState, useEffect, useCallback, use as useReact } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
   Zap, 
@@ -13,7 +13,8 @@ import {
   LayoutGrid,
   List,
   Flag,
-  ChevronDown
+  Pencil,
+  Trash2
 } from 'lucide-react'
 import { Skeleton } from '@/components/Skeleton'
 import { toast } from 'react-hot-toast'
@@ -42,8 +43,8 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
 
   const supabase = createClient()
 
-  const fetchSprints = async () => {
-    setIsLoading(true)
+  const fetchSprints = useCallback(async () => {
+    Promise.resolve().then(() => setIsLoading(true))
     const { data, error } = await supabase
       .from('sprints')
       .select('*, tickets(status)')
@@ -54,14 +55,25 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
       console.error('Error fetching sprints:', error)
       toast.error('Failed to load sprints')
     } else if (data) {
-      setSprints(data as any)
+      setSprints(data as unknown as Sprint[])
     }
     setIsLoading(false)
-  }
+  }, [projectId, view, supabase])
 
   useEffect(() => {
-    fetchSprints()
-  }, [orgId, projectId, view])
+    const timer = setTimeout(() => {
+      fetchSprints()
+    }, 0)
+
+    const handleRefresh = () => {
+      fetchSprints()
+    }
+    window.addEventListener('refresh-sprints', handleRefresh)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('refresh-sprints', handleRefresh)
+    }
+  }, [fetchSprints])
 
   const handleCreateSprint = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -113,7 +125,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Sprints</h1>
-          <p className="text-muted text-sm mt-1">Plan and track your team's development cycles.</p>
+          <p className="text-muted text-sm mt-1">Plan and track your team&apos;s development cycles.</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="bg-accent rounded-lg p-1 flex items-center border border-border">
@@ -178,9 +190,22 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                       <div className={`flex items-center gap-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${status.color}`}>
                         {isActive && <Zap size={10} className="fill-current" />} {status.label}
                       </div>
-                      <button className="text-muted hover:text-foreground">
-                        <X size={14} />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => window.dispatchEvent(new CustomEvent('open-edit-sprint-modal', { detail: { sprint, projectId } }))}
+                          className="text-muted hover:text-primary p-1 hover:bg-accent rounded transition-all"
+                          title="Edit Sprint"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button 
+                          onClick={() => window.dispatchEvent(new CustomEvent('open-delete-sprint-modal', { detail: { sprint, projectId } }))}
+                          className="text-muted hover:text-destructive p-1 hover:bg-accent rounded transition-all"
+                          title="Delete Sprint"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                     
                     <div>
@@ -196,7 +221,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted uppercase tracking-wider mb-1">
                           <Target size={12} /> Goal
                         </div>
-                        <p className="text-[12px] text-foreground/80 leading-relaxed italic">"{sprint.goal}"</p>
+                        <p className="text-[12px] text-foreground/80 leading-relaxed italic">&quot;{sprint.goal}&quot;</p>
                       </div>
                     )}
                     
@@ -287,15 +312,31 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
                     <div className={`flex-1 p-5 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20 shadow-lg shadow-primary/5' : 'bg-accent/20 border-border/60'} transition-all group-hover:bg-accent/40`}>
                       <div className="flex justify-between items-start mb-3">
                         <h3 className="text-base font-bold text-foreground tracking-tight group-hover:text-primary transition-colors">{sprint.name}</h3>
-                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${status.color}`}>
-                          {status.label}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${status.color}`}>
+                            {status.label}
+                          </span>
+                          <button 
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-edit-sprint-modal', { detail: { sprint, projectId } }))}
+                            className="text-muted hover:text-primary p-1 hover:bg-accent rounded transition-all"
+                            title="Edit Sprint"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button 
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-delete-sprint-modal', { detail: { sprint, projectId } }))}
+                            className="text-muted hover:text-destructive p-1 hover:bg-accent rounded transition-all"
+                            title="Delete Sprint"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                       
                       {sprint.goal && (
                         <div className="flex gap-2 items-start text-[12px] text-muted leading-relaxed italic mb-4">
                           <Target size={14} className="shrink-0 mt-0.5 opacity-40" />
-                          "{sprint.goal}"
+                          &quot;{sprint.goal}&quot;
                         </div>
                       )}
 
@@ -348,7 +389,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
             </div>
             <div>
               <h4 className="text-sm font-bold text-foreground tracking-tight">Deadlines</h4>
-              <p className="text-[12px] text-muted mt-1 leading-relaxed">Ensure all tickets are moved to 'Review' at least 24h before sprint end.</p>
+              <p className="text-[12px] text-muted mt-1 leading-relaxed">Ensure all tickets are moved to &apos;Review&apos; at least 24h before sprint end.</p>
             </div>
           </div>
         </div>
