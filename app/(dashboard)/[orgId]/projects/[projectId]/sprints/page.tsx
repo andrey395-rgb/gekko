@@ -49,7 +49,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
       .from('sprints')
       .select('*, tickets(status)')
       .eq('project_id', projectId)
-      .order('start_date', { ascending: view === 'timeline' })
+      .order('start_date', { ascending: true })
 
     if (error) {
       console.error('Error fetching sprints:', error)
@@ -58,7 +58,7 @@ export default function SprintsPage({ params }: { params: Promise<{ orgId: strin
       setSprints(data as unknown as Sprint[])
     }
     setIsLoading(false)
-  }, [projectId, view, supabase])
+  }, [projectId, supabase])
 
   useEffect(() => {
     const timer = setTimeout(() => {
